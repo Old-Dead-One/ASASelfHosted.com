@@ -1,0 +1,30 @@
+ASASelfHosted.com -Tech Stack
+Frontend
+React + TypeScript + Vite
+Tailwind CSS (with Tailwind UI)
+Radix UI (accessible headless components)
+shadcn/ui (locally owned component starters, used selectively)
+TanStack Query (data fetching, caching, error handling)
+React Hook Form + Zod (forms and schema validation)
+Backend
+Python + Pydantic
+Supabase (Postgres, Auth, RLS, Storage) – primary data and auth platform
+FastAPI (Python) – secure plugin endpoints, Stripe webhooks, verification logic, background jobs
+Database & Auth
+Supabase Postgres (source of truth)
+Supabase Auth (email-based authentication)
+Row Level Security (ownership and permission enforcement)
+Payments
+Stripe (Verified+ subscriptions and key quotas)
+Note: Research alternative payment service with small or no fees (Venmo, Paypal, CashApp, etc.)
+Plugin
+ASA Server API plugin
+Public/private key cryptographic verification
+Signed heartbeats for automated status, uptime, and cluster identity
+Infrastructure
+Supabase (managed backend services)
+Fly.io or Render (FastAPI hosting)
+Sentry (frontend + backend error monitoring)
+Design Direction
+Classic Registry foundation with Tactical Sci-Fi accents
+Accessibility-first, performance-focused, long-term maintainable

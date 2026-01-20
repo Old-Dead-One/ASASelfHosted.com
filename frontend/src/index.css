@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Base: Slate/graphite neutrals */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    
+    /* Primary: Cyan accent (tactical sci-fi) */
+    --primary: 188 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Accent: Slightly lighter cyan for hover states */
+    --accent: 188 60% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --ring: 188 85% 45%;
+    
+    /* Status colors */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Tactical accents */
+    --gridline: 214.3 31.8% 85%;
+    --panel: 210 40% 98%;
+    
+    /* Border radius */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark mode: Cooler, slightly desaturated slate base */
+    --background: 222.2 47.4% 11.2%;
+    --foreground: 210 40% 98%;
+    
+    --card: 222.2 47.4% 11.2%;
+    --card-foreground: 210 40% 98%;
+    
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    
+    /* Primary: Brighter cyan for dark mode */
+    --primary: 188 85% 55%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    
+    --accent: 188 60% 60%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    --ring: 188 85% 55%;
+    
+    /* Status colors (adjusted for dark) */
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --success: 142 71% 55%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 60%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Tactical accents (dark) */
+    --gridline: 217.2 32.6% 25%;
+    --panel: 222.2 47.4% 15%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}

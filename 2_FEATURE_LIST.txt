@@ -1,0 +1,166 @@
+ASASelfHosted.com - Feature List
+TAGLINE
+Primary Tagline (public-facing):
+The official registry for Ark Survival Ascended self-hosted servers.
+Secondary (about page, tone allowed):
+Wildcard and Nitrado don’t appear interested in solving self-hosted discovery. So we did.
+A. WEBSITE FEATURES
+Core Directory (Always Free)
+Server listings (individual)
+Status (online/offline)
+Manual - Mod list
+Manual - Rates
+Manual - Wipe info
+Manual - Cluster association (view-only)
+Public server page
+Join instructions (PC / Console)
+Password field (if needed)
+Search & filters
+Favorites (players)
+Player accounts (always free)
+
+Badge System (Website-Driven)
+Applies to servers, clusters, and players
+Server Badges
+Verified
+Stable (uptime-based)
+New
+Hot
+Long-Runner
+PvE / PvP
+Vanilla / Boosted
+Cluster Badges
+Verified Cluster
+Full Map Coverage
+Stable Cluster
+Growing
+Hardcore / Casual - See if we can have a blackbox that calculates this from mod list and server setup
+Player Badges
+Verified Player
+Active
+PvP Ranked (future)
+Cluster Loyalist
+Founder
+Badges are data-driven, not cosmetic purchases.
+
+Player Directory (Free)
+Player profiles
+Favorited servers
+Favorited clusters
+Activity indicators
+Optional public visibility
+Auto-favorite onJoin toggle (plugin-assisted later)
+
+Banner Carousels (Non-Monetized)
+Three fixed homepage carousels:
+Top 100
+Stability
+Activity
+Verified weight
+Hot / Up & Coming
+Growth velocity
+New activity spikes
+Newbie Servers
+Recently added
+New owners
+Explicit “learning-friendly” tag
+No paid placement. Ever! I will have classy add space available, but it will never tie to rankings.
+
+Subscription Logic (Website Side)
+Free accounts
+Server owner dashboard
+Subscription management
+Key generation & rotation
+Cluster management UI
+
+B. PLUGIN FEATURES (ASA SERVER API)
+
+Core Plugin (Required for Verified+)
+Secure handshake (public/private keys)
+Signed heartbeat
+Server identity verification
+Map identity reporting
+Cluster identity via private key
+Version reporting
+
+Automation Features (Subscription)
+Auto status updates
+Auto uptime tracking
+Auto wipe reporting
+Auto mod hash reporting
+Auto password sync (encrypted)
+Auto-favorite onJoin signal (player opted-in)
+Look at adding more opt-in server/cluster tracking and reporting
+
+Cluster Key Model (This Is Correct)
+Private Key: one-to-many (cluster owner)
+Public Key: one-to-one (server instance)
+Pricing Recommendation (Simple, Fair)
+Base subscription: $20/year
+Includes up to 12 public keys (covers all official maps)
+Additional public keys: $2/year each (max of 8)
+A total of 20 keys per license
+
+Plugin Utility Extras (Phase 2+)
+Discord webhook events
+Scheduled restarts
+Activity summaries
+Admin diagnostics
+Future PvP stat hooks
+
+C. DISCORD BOT FEATURES
+
+Free Bot
+Server status embed
+Manual announcements
+Wipe announcements
+Join instructions
+
+Verified+ Bot
+Auto status sync
+Player activity signals
+Server growth metrics
+Cluster summary posts
+Ranking signal contributor
+Badge triggers
+
+3. 90% MVP SCOPE LOCK (30 DAYS, SOLO DEV)
+Website
+Public directory
+Search fields
+Individual server listings
+Manual/Verified + status
+Favorites
+Player accounts
+Server pages
+Join instructions
+One carousel: Newbie
+Basic badges (Verified / New / PvE / PvP / Cluster)
+Subscription plumbing (even if minimal UI)
+Classy non-obtrusive add space
+Plugin
+Secure key system
+Server verification
+Auto status
+Map identity
+Cluster grouping
+Heartbeat endpoint
+Discord (this could be post MVP)
+Status embed
+Wipe announcement
+Verification hook
+
+🟡 PHASE 1.5 (Post-Launch, Weeks 5–8)
+Cluster pages
+Additional Badges
+Top 100 & Hot carousels
+Password sync
+Auto-favorite onJoin
+Player directory expansion
+
+🔴 PHASE 2 (Do Not Touch Yet)
+Player rankings
+PvP leaderboards
+Activity weighting
+Advanced analytics
+Monetized addons

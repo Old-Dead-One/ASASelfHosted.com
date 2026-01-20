@@ -1,0 +1,302 @@
+ASASelfHosted.com — Development Plan v1 (Web + Agent MVP)
+Project Purpose
+ASASelfHosted.com is a vendor-neutral registry for Ark: Survival Ascended self-hosted servers. It solves discovery and trust by providing:
+A free public directory and join paths (copy commands / Steam direct)
+Reliable “Verified” server status via a local host agent that runs outside the ASA ecosystem and reports health to ASASelfHosted.com
+The agent makes verification free and reliable, without requiring ASA Server API, mods, or constant plugin maintenance.
+
+Tech Stack v1 (Long-term, Low-regret)
+Frontend (Web)
+React + TypeScript + Vite
+Tailwind CSS (+ Tailwind UI kit you own)
+Radix UI (accessible headless primitives)
+shadcn/ui (selectively; copied into repo, owned code)
+TanStack Query (fetching/caching/error handling/retry/refetch)
+React Hook Form + Zod (forms + schema validation)
+React Router (routing)
+Design direction: Classic Registry foundation with Tactical Sci-Fi accents.
+
+Backend (Cloud)
+Supabase (Primary platform)
+Postgres (source of truth)
+Auth (email)
+RLS (ownership + password gating)
+Storage (post-MVP: logos/banners)
+FastAPI (Python + Pydantic) (thin service for what Supabase shouldn’t do)
+Agent heartbeat ingestion + signature validation + rate limiting
+Stripe webhooks (if monetization is added later; can exist but not required for MVP)
+Optional: background jobs for badges/ranking computation
+Hosting for FastAPI: Fly.io or Render (pick one and commit for MVP).
+Monitoring: Sentry (web + API)
+
+Local Host Agent (Free Verification)
+Recommended implementation (in your wheelhouse):
+Node.js + TypeScript agent service
+Simple local web UI served by the agent (no heavy desktop framework)
+Packaged into Windows .exe for adoption
+Communicates to ASASelfHosted via outbound HTTPS heartbeats
+Alternative later: Python agent (FastAPI local) if you decide packaging is easier there—but TS is fine and aligned with your strength.
+
+System Architecture (MVP)
+Components
+Web App
+directory + server pages + owner dashboard
+Supabase
+data + auth + permission enforcement
+FastAPI
+agent heartbeat endpoints (secure + validated)
+Host Agent
+local checks + RYG lights + periodic heartbeat
+Data Flow
+Owners list servers and (optionally) generate an Agent Token
+Agent runs on the host machine, performs health checks, posts signed heartbeats
+FastAPI verifies signature + replay protection, updates server status in Supabase
+Web App reads directory via a single view (directory_view) for performance and consistency
+
+Verification Model (MVP)
+Status sources
+Manual (owner-set, free)
+Agent Verified (free, reliable)
+Status precedence
+If agent data exists and is fresh: agent status wins
+Manual remains visible as “Owner note” but does not override verified state
+Confidence levels (RYG)
+Green: process ok + ports ok + heartbeat ok
+Yellow: process ok but ports uncertain OR heartbeat failing
+Red: process down OR repeated failures
+(Keep the logic deterministic and documented.)
+
+Database Model (Supabase)
+Core tables (MVP)
+profiles
+servers
+server_status
+favorites
+Agent tables (MVP)
+agents
+agent_id
+owner_id
+token_hash
+created_at
+revoked_at
+agent_instances
+instance_id
+agent_id
+server_id
+name
+ports (json)
+process_hint (optional)
+created_at
+agent_heartbeats (optional but recommended for debugging)
+agent_id, server_id, received_at, status_payload (json)
+Supporting views
+directory_view (single read model for the UI)
+joins servers + effective status + badge flags + favorite counts
+RLS rules (must-have)
+Public read: directory_view
+Owners can CRUD only their servers
+Password field: readable only by
+owner
+users who favorited that server
+Agent token never exposed after creation (store hash only)
+
+API Contracts
+FastAPI endpoints (MVP)
+POST /agent/heartbeat
+Auth: HMAC signature with agent token
+Payload: timestamp, nonce, server_id, checks, agent_version
+Server validates:
+token active
+timestamp window
+nonce not reused recently
+signature correct
+Writes:
+server_status.last_seen_at
+server_status.status_source = 'agent'
+server_status.effective_status
+optional heartbeat log entry
+POST /agent/revoke
+Owner-authenticated (Supabase JWT)
+Revokes token (sets revoked_at)
+Supabase usage
+Most CRUD reads/writes via Supabase client directly
+FastAPI only handles the security-sensitive ingestion/verification side
+
+Web App UX/UI Tree (MVP)
+Public
+Home (Newbie carousel)
+Directory (filters + search)
+Server details (join panel + status + badges)
+About
+Pricing (optional, can be stubbed)
+FAQ
+Terms / Privacy
+Player (Auth)
+Dashboard (favorites)
+Account settings
+Owner (Auth)
+Owner dashboard (my servers)
+Create/edit server
+Manual status controls
+Agent setup
+generate token
+link token to servers/instances
+“how to install agent” instructions
+see last heartbeat
+
+Local Agent — MVP Requirements
+Agent capabilities (v0.1)
+Local web UI (served at http://localhost:<port>)
+Configure multiple instances
+name
+ports (game, query optional, rcon optional)
+process hint (optional)
+Run checks every X minutes (default 300s)
+“Test now” button
+Show R/Y/G lights per instance + overall
+Logs view / open logs
+Outbound heartbeat to ASASelfHosted (signed)
+Checks (v0.1)
+Process check (Windows): process exists by name and/or command line hint
+Port check:
+TCP checks where applicable
+For UDP: start with “configured and reported” + later improve; don’t block MVP on perfect UDP semantics
+Heartbeat delivery success
+Packaging + install
+Windows .exe installer or portable exe
+“Run at startup” helper (creates scheduled task)
+Config stored locally (json)
+
+Agile + Scrum Development Schedule (45 Days)
+Cadence: 3 x 2-week sprints + stabilization
+Goal: Web MVP + Free Verified Agent shipped by Day 45.
+Sprint 0 (Days 1–5) — Foundation & Canon
+Goal: Set up the foundation so you don’t refactor later.
+Web
+Repo scaffold (web)
+Tailwind + base layout
+TanStack Query bootstrapped
+Zod + RHF form pattern established
+Radix/shadcn baseline components added (dialog, toast)
+Supabase
+Schema migrations created
+RLS policies implemented and tested
+directory_view implemented
+FastAPI
+Base app scaffold
+Supabase JWT verification middleware
+Rate limiting scaffold
+Acceptance
+User can sign up/login
+Owner can create a server record (even via basic form)
+Public directory loads from directory_view
+
+Sprint 1 (Days 6–17) — Free Directory MVP
+Goal: The site is useful without verification.
+Web deliverables
+Home
+Directory list + filters
+Server details page + join panel (copy buttons)
+Auth pages
+Player favorites
+Owner dashboard + server CRUD
+Manual status + last updated
+Password gating (favorite → reveal)
+Acceptance
+Full free loop works end-to-end
+Permissions correct (RLS)
+Directory fast enough to use
+
+Sprint 2 (Days 18–29) — Agent Verified (Free)
+Goal: Reliable automated status without ASA plugin.
+Web deliverables
+Owner agent setup page:
+generate token
+instructions
+show last heartbeat per server
+Server pages show:
+Verified by Agent badge
+status source + last seen
+FastAPI deliverables
+/agent/heartbeat endpoint:
+HMAC validation
+replay protection
+writes effective status to Supabase
+Token revoke endpoint
+Agent deliverables
+Local UI:
+instance table
+R/Y/G lights
+test now
+logs
+Checks:
+process
+port
+Heartbeat push every 300s
+Acceptance
+Agent updates server status reliably
+Revoke token immediately stops updates
+UI clearly shows “working/not working” locally
+
+Sprint 3 (Days 30–39) — Badges + Newbie Carousel + Polish
+Goal: Discovery layer feels real.
+Deliverables
+Badge engine (MVP set):
+Verified (agent)
+New
+Stable
+PvE/PvP, Vanilla/Boosted
+Newbie carousel (only required carousel in MVP)
+Feature flags scaffold for Hot/Top 100
+Owner diagnostics panel (last 20 heartbeats/errors)
+Acceptance
+Badges deterministic and documented
+Carousel updates correctly
+No “mystery status” behavior
+
+Stabilization (Days 40–45) — Launch Hardening
+Goal: Ship safely.
+Must-do hardening
+Rate limits on heartbeat endpoint
+Better error messages in agent UI
+Sentry (web + api)
+Deployment runbook
+Backups + basic ops checklist
+Packaging agent into .exe
+Docs:
+install agent
+troubleshooting
+revoke/rotate token
+firewall tips
+Acceptance
+Production deploy
+Agent install success on a clean Windows host
+Rollback path exists
+
+Post-Launch Roadmap (Optional, Demand-driven)
+Top/Hot carousels
+External reachability check (cloud-side)
+Cluster pages (still free, powered by agent grouping)
+Paid plugin utility suite (only if demand justifies maintenance)
+Discord bot integration (optional)
+
+Final MVP Scope Guardrails (to prevent scope creep)
+In MVP
+Web directory + accounts + favorites + password gating
+Manual status
+Agent verified status (free)
+Basic badges + Newbie carousel
+Not in MVP
+ASA Server API plugin
+PvP leaderboards / player ranking
+Discord bot
+Hot/Top 100 carousels (feature flagged)
+
+If you want the next “build-ready” deliverable, say: “Generate the Agent API contract + DB migrations outline.”
+I’ll output:
+exact request/response payloads
+HMAC signature scheme
+nonce/timestamp rules
+migration SQL checklist
+so you can start coding without guessing.
+
