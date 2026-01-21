@@ -10,7 +10,9 @@ for more granular control. This middleware can be used for global auth if needed
 
 from fastapi import Request
 
-from app.core.security import UserIdentity, verify_supabase_jwt
+from app.core.config import get_settings
+from app.core.errors import UnauthorizedError
+from app.core.security import verify_supabase_jwt
 
 
 async def auth_middleware(request: Request, call_next):
@@ -21,17 +23,31 @@ async def auth_middleware(request: Request, call_next):
     and attaches UserIdentity to request.state.
 
     This is optional - most endpoints use dependencies instead.
+    Sets request.state.user = None initially, then sets it if token is valid.
     """
-    # Only process if Authorization header is present
+    # Initialize user state
+    request.state.user = None
+
+    settings = get_settings()
+    
+    # Local bypass: set fake user if enabled
+    if settings.ENV == "local" and settings.AUTH_BYPASS_LOCAL:
+        dev_user_id = request.headers.get("X-Dev-User", "").strip() or None
+        request.state.user = verify_supabase_jwt("bypass-token", dev_user_id=dev_user_id)
+        return await call_next(request)
+
+    # Check for Authorization header
     auth_header = request.headers.get("Authorization")
-    if auth_header:
-        try:
-            user = await verify_supabase_jwt(request)
-            request.state.user = user
-        except Exception:
-            # Invalid token, but don't fail here
-            # Let individual endpoints handle auth requirements
-            pass
+    if auth_header and auth_header.lower().startswith("bearer "):
+        # Extract token (slice after "bearer " - 7 characters)
+        token = auth_header[7:].strip()
+        if token:
+            try:
+                # Verify token and set user
+                request.state.user = verify_supabase_jwt(token)
+            except UnauthorizedError:
+                # Invalid token - don't fail, individual endpoints will handle auth requirements
+                pass
 
     response = await call_next(request)
     return response

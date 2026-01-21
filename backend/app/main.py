@@ -5,36 +5,60 @@ API-first architecture with consent-first design.
 Backend enforces rules, not UI.
 """
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.errors import setup_error_handlers
-
-# Initialize Sentry if DSN is provided and package is available
-try:
-    import sentry_sdk
-    from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-    if settings.SENTRY_DSN:
-        sentry_sdk.init(
-            dsn=settings.SENTRY_DSN,
-            integrations=[FastApiIntegration()],
-            traces_sample_rate=1.0 if settings.ENV == "local" else 0.1,
-            environment=settings.ENV,
-        )
-except ImportError:
-    # Sentry not installed, continue without it
-    pass
 
 
 def create_app() -> FastAPI:
     """
     Create and configure FastAPI application.
-    
+
     Returns configured FastAPI app instance.
     """
+    settings = get_settings()
+
+    # Validate config early (prevent booting broken environments)
+    # Enforces required config in staging/production and safety walls like auth bypass
+    settings.validate_non_local()
+
+    # Startup config banner
+    logger = logging.getLogger("asaselfhosted.startup")
+    
+    auth_mode = "BYPASS" if (settings.ENV == "local" and settings.AUTH_BYPASS_LOCAL) else "REAL"
+    cors_count = len(settings.cors_origins_list)
+    cors_list = ", ".join(settings.cors_origins_list[:3]) + ("..." if cors_count > 3 else "")
+    
+    logger.info("=" * 60)
+    logger.info("ASASelfHosted.com API Starting")
+    logger.info(f"ENV: {settings.ENV}")
+    logger.info(f"AUTH MODE: {auth_mode}")
+    logger.info(f"DIRECTORY VIEW: {settings.DIRECTORY_VIEW_NAME}")
+    logger.info(f"CORS ORIGINS: {cors_count} ({cors_list})")
+    logger.info("=" * 60)
+
+    # Initialize Sentry if DSN is provided and package is available
+    # Moved here for deterministic startup and testability
+    try:
+        import sentry_sdk  # type: ignore
+        from sentry_sdk.integrations.fastapi import FastApiIntegration  # type: ignore
+
+        if settings.SENTRY_DSN:
+            sentry_sdk.init(
+                dsn=settings.SENTRY_DSN,
+                integrations=[FastApiIntegration()],
+                traces_sample_rate=1.0 if settings.ENV == "local" else 0.1,
+                environment=settings.ENV,
+            )
+    except ImportError:
+        # Sentry not installed, continue without it
+        pass
+
     app = FastAPI(
         title="ASASelfHosted.com API",
         description="Public registry API for self-hosted Ark: Survival Ascended servers",
@@ -44,33 +68,43 @@ def create_app() -> FastAPI:
     )
 
     # CORS configuration
-    # Frontend origin will be configured via environment variables
+    cors_origins = settings.cors_origins_list
+
+    # Dev fallback only (non-local validation ensures staging/prod is correct)
+    if not cors_origins:
+        cors_origins = ["http://localhost:3000", "http://localhost:5173"]
+
+    # Starlette rejects "*" with allow_credentials=True; keep it out of non-local environments
+    if "*" in cors_origins and settings.ENV in ("staging", "production"):
+        raise ValueError("Cannot use '*' origin with allow_credentials=True in staging/production")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allow_headers=["*"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "X-Request-ID",
+            "X-Dev-User",
+        ],
     )
 
-    # Setup error handlers
+    # Add request ID middleware (must be before error handlers)
+    from app.middleware.request_id import request_id_middleware
+
+    app.middleware("http")(request_id_middleware)
+
+    # Setup error handlers (after middleware so request_id is available)
     setup_error_handlers(app)
 
-    # Optional: Add auth middleware for global JWT verification
-    # Most endpoints use dependencies (require_user/optional_user) instead
-    # Uncomment if you want global auth middleware:
-    # from app.middleware.auth import auth_middleware
-    # app.middleware("http")(auth_middleware)
-
     # Include API routers
-    app.include_router(v1_router)
+    app.include_router(v1_router, prefix=settings.API_V1_PREFIX)
 
     @app.get("/health")
     async def health_check():
-        """
-        Health check endpoint.
-        No authentication required.
-        """
         return {"status": "ok"}
 
     return app

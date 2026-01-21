@@ -7,6 +7,10 @@ export default {
   ],
   theme: {
     extend: {
+      // Design system intent:
+      // - Neutral, readable base (registry-first)
+      // - Tactical sci-fi accents via gridline, panel, status colors
+      // - No neon, no glow, no gimmicks
       colors: {
         // Semantic tokens via CSS variables
         // These map to CSS variables defined in index.css
@@ -52,6 +56,10 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      // TODO (Phase 1.5+): Add mono font for join commands, server IPs, console instructions
+      // fontFamily: {
+      //   mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+      // },
     },
   },
   plugins: [],

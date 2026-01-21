@@ -13,47 +13,33 @@ interface BadgeProps {
     className?: string
 }
 
+// Shared variant styles to reduce duplication
+const accentOutline = 'bg-accent/20 text-primary border border-primary'
+const dangerOutline = 'bg-destructive/20 text-destructive border border-destructive'
+const successOutline = 'bg-success/20 text-success border border-success'
+
 const badgeConfig: Record<BadgeType, { label: string; variant: string }> = {
-    verified: {
-        label: 'Verified',
-        variant: 'bg-primary text-primary-foreground',
-    },
-    new: {
-        label: 'New',
-        variant: 'bg-accent text-accent-foreground',
-    },
-    stable: {
-        label: 'Stable',
-        variant: 'bg-success text-success-foreground',
-    },
-    pvp: {
-        label: 'PvP',
-        variant: 'bg-destructive/20 text-destructive border border-destructive/30',
-    },
-    pve: {
-        label: 'PvE',
-        variant: 'bg-success/20 text-success border border-success/30',
-    },
-    vanilla: {
-        label: 'Vanilla',
-        variant: 'bg-muted text-muted-foreground',
-    },
-    boosted: {
-        label: 'Boosted',
-        variant: 'bg-warning/20 text-warning border border-warning/30',
-    },
-    newbie_friendly: {
-        label: 'Newbie Friendly',
-        variant: 'bg-accent/20 text-accent-foreground border border-accent/30',
-    },
-    learning_friendly: {
-        label: 'Learning Friendly',
-        variant: 'bg-accent/20 text-accent-foreground border border-accent/30',
-    },
+    verified: { label: 'Verified', variant: 'bg-primary text-primary-foreground border border-primary-foreground' },
+    new: { label: 'New', variant: 'bg-accent text-accent-foreground border border-accent-foreground' },
+    stable: { label: 'Stable', variant: 'bg-success text-success-foreground border border-success-foreground' },
+
+    pvp: { label: 'PvP', variant: dangerOutline },
+    pve: { label: 'PvE', variant: successOutline },
+    pvpve: { label: 'PvPvE', variant: accentOutline },
+
+    vanilla: { label: 'Vanilla', variant: 'bg-muted text-muted-foreground border border-muted-foreground' },
+
+    // Until you define real "warning" tokens, keep this inside existing palette
+    boosted: { label: 'Boosted', variant: accentOutline },
+
+    newbie_friendly: { label: 'Newbie Friendly', variant: accentOutline },
+    learning_friendly: { label: 'Learning Friendly', variant: accentOutline },
 }
 
 export function Badge({ type, className }: BadgeProps) {
-    const config = badgeConfig[type]
+    // Safe fallback for unknown badge types (backend might add new types before frontend updates)
+    const config =
+        badgeConfig[type] ?? { label: type, variant: 'bg-muted text-muted-foreground' }
 
     return (
         <span

@@ -15,15 +15,24 @@ class BaseSchema(BaseModel):
     """
 
     model_config = ConfigDict(
-        # Validate assignment (raises on invalid assignment)
-        validate_assignment=True,
-        # Use enum values, not names
-        use_enum_values=True,
-        # Serialize by alias
-        by_alias=True,
-        # Extra fields are ignored (prevents injection via extra fields)
+        # Extra fields are forbidden (prevents injection via extra fields)
         extra="forbid",
+        # Allow ORM-like objects and dicts to be converted
+        from_attributes=True,
     )
+
+
+class APIErrorBody(BaseSchema):
+    """
+    Error body structure.
+
+    Matches the error format returned by error handlers in errors.py.
+    """
+
+    code: str
+    message: str
+    details: dict | None = None
+    request_id: str | None = None
 
 
 class ErrorResponse(BaseSchema):
@@ -34,7 +43,7 @@ class ErrorResponse(BaseSchema):
     Frontend can rely on this format.
     """
 
-    error: dict[str, str | dict]
+    error: APIErrorBody
 
 
 class SuccessResponse(BaseSchema):

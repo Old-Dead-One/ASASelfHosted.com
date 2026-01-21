@@ -14,8 +14,11 @@ interface ServerCardProps {
 }
 
 export function ServerCard({ server }: ServerCardProps) {
+    const favoriteCount = server.favorite_count ?? 0
+    const favoriteLabel = favoriteCount === 1 ? '1 favorite' : `${favoriteCount} favorites`
+
     return (
-        <div className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+        <div className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors flex flex-col h-full">
             {/* Header */}
             <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex-1 min-w-0">
@@ -28,7 +31,7 @@ export function ServerCard({ server }: ServerCardProps) {
                         </p>
                     )}
                 </div>
-                <StatusBadge status={server.effective_status} />
+                <StatusBadge status={server.effective_status ?? 'unknown'} />
             </div>
 
             {/* Description */}
@@ -45,16 +48,8 @@ export function ServerCard({ server }: ServerCardProps) {
                         {server.map_name}
                     </span>
                 )}
-                {server.pvp_enabled ? (
-                    <Badge type="pvp" />
-                ) : (
-                    <Badge type="pve" />
-                )}
-                {server.vanilla ? (
-                    <Badge type="vanilla" />
-                ) : (
-                    <Badge type="boosted" />
-                )}
+                {server.game_mode && <Badge type={server.game_mode} />}
+                {server.server_type && <Badge type={server.server_type} />}
             </div>
 
             {/* Badges */}
@@ -64,14 +59,19 @@ export function ServerCard({ server }: ServerCardProps) {
                 {server.is_stable && <Badge type="stable" />}
             </div>
 
+            {/* Spacer to push footer to bottom */}
+            <div className="flex-1" />
+
             {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-gridline">
-                <div className="text-xs text-muted-foreground">
-                    {server.favorite_count} {server.favorite_count === 1 ? 'favorite' : 'favorites'}
-                </div>
-                <button className="text-sm text-primary hover:text-accent font-medium transition-colors">
+            {/* TODO (Phase 1.5+): Make entire card clickable with accessible focus styles once routing exists */}
+            <div className="flex items-center justify-between pt-4 border-t border-border mt-4">
+                <div className="text-xs text-muted-foreground">{favoriteLabel}</div>
+                <a
+                    href={`/servers/${server.id}`}
+                    className="text-sm text-primary hover:text-accent font-medium transition-colors"
+                >
                     View Details →
-                </button>
+                </a>
             </div>
         </div>
     )

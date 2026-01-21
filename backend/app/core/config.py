@@ -5,6 +5,9 @@ All environment variables are loaded here.
 No secrets in code, ever.
 """
 
+from functools import lru_cache
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,17 +19,16 @@ class Settings(BaseSettings):
     Missing required values will raise ValidationError at startup.
     """
 
-    # Environment
-    ENV: str = "local"  # local, development, production
+    # Environment (strict type prevents typos like "prod" instead of "production")
+    ENV: Literal["local", "development", "staging", "production"] = "local"
     DEBUG: bool = False
 
     # API
     API_V1_PREFIX: str = "/api/v1"
 
     # CORS (comma-separated string, parsed to list)
-    # Default includes both common Vite dev ports
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ORIGINS string into list."""
@@ -35,7 +37,18 @@ class Settings(BaseSettings):
     # Supabase (optional for development scaffolding)
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""  # Public anon key (if needed for client-side)
-    SUPABASE_SERVICE_ROLE_KEY: str = ""  # Service role key (avoid in normal flows, RLS is boss)
+    SUPABASE_SERVICE_ROLE_KEY: str = ""  # Service role key (backend only; use sparingly)
+
+    # JWT verification (JWKS-based, not secret-based)
+    SUPABASE_JWT_ISSUER: str = ""  # https://<project-ref>.supabase.co/auth/v1
+    SUPABASE_JWKS_URL: str = ""  # https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+    SUPABASE_JWT_AUDIENCE: str = "authenticated"  # Set "" to disable audience verification
+
+    # Auth bypass (local development only - explicit opt-in)
+    AUTH_BYPASS_LOCAL: bool = False
+
+    # Directory view name (configurable for future migrations)
+    DIRECTORY_VIEW_NAME: str = "directory_view"
 
     # Stripe (optional for development scaffolding)
     STRIPE_SECRET_KEY: str = ""
@@ -45,16 +58,49 @@ class Settings(BaseSettings):
     SENTRY_DSN: str | None = None
 
     # Rate Limiting
-    RATE_LIMIT_ENABLED: bool = False  # Disabled by default in local dev
+    RATE_LIMIT_ENABLED: bool = False
+
+    def validate_non_local(self) -> None:
+        """
+        Validate required config for non-local environments.
+        Call this at startup in create_app() for staging/production.
+
+        Also enforces that auth bypass is ONLY allowed in local.
+        """
+        # Hard wall: bypass is local-only, always
+        if self.AUTH_BYPASS_LOCAL and self.ENV != "local":
+            raise ValueError("AUTH_BYPASS_LOCAL may only be enabled when ENV=local")
+
+        if self.ENV not in ("staging", "production"):
+            return
+
+        if not self.cors_origins_list:
+            raise ValueError("CORS_ORIGINS must be set in staging/production")
+
+        if not self.SUPABASE_URL:
+            raise ValueError("SUPABASE_URL must be set in staging/production")
+
+        if not self.SUPABASE_ANON_KEY:
+            raise ValueError("SUPABASE_ANON_KEY must be set in staging/production")
+
+        if not self.SUPABASE_JWT_ISSUER:
+            raise ValueError("SUPABASE_JWT_ISSUER must be set in staging/production")
+
+        if not self.SUPABASE_JWKS_URL:
+            raise ValueError("SUPABASE_JWKS_URL must be set in staging/production")
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore",  # Ignore extra env vars to prevent accidental exposure
+        extra="ignore",
     )
 
 
-# Global settings instance
-# Will raise ValidationError if required env vars are missing
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+
+# Backward compatibility: keep global settings for existing imports
+settings = get_settings()

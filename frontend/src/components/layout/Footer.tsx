@@ -6,11 +6,11 @@
 
 export function Footer() {
     return (
-        <footer className="border-t border-gridline bg-panel mt-auto">
+        <footer className="border-t border-border bg-panel mt-auto">
             <div className="container mx-auto px-4 py-6">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <p className="text-sm text-muted-foreground">
-                        ASASelfHosted.com — Public registry for self-hosted ASA servers
+                        ASASelfHosted — Self-hosted ASA server registry
                     </p>
                     <div className="flex gap-6 text-sm">
                         <a
@@ -20,14 +20,16 @@ export function Footer() {
                             About
                         </a>
                         <a
-                            href="/terms"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            href="#"
+                            aria-disabled="true"
+                            className="text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
                         >
                             Terms
                         </a>
                         <a
-                            href="/privacy"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            href="#"
+                            aria-disabled="true"
+                            className="text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
                         >
                             Privacy
                         </a>

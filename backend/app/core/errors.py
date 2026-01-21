@@ -5,9 +5,17 @@ All API errors follow a consistent format.
 Frontend can rely on predictable error responses.
 """
 
+import logging
+
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError as FastAPIRequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
+
+from app.core.config import get_settings
+
+# Logger for error tracking
+logger = logging.getLogger("asaselfhosted")
 
 
 class APIError(Exception):
@@ -30,8 +38,13 @@ class APIError(Exception):
         super().__init__(self.message)
 
 
-class RequestValidationError(APIError):
-    """Request validation failed."""
+class DomainValidationError(APIError):
+    """
+    Domain-level validation error.
+
+    Used for internal validation logic (not HTTP request validation).
+    FastAPI handles HTTP request validation separately.
+    """
 
     def __init__(self, message: str, details: dict | None = None):
         super().__init__(
@@ -40,6 +53,11 @@ class RequestValidationError(APIError):
             error_code="VALIDATION_ERROR",
         )
         self.details = details
+
+
+# Keep RequestValidationError as alias for backward compatibility
+# TODO: Migrate all usages to DomainValidationError
+RequestValidationError = DomainValidationError
 
 
 class NotFoundError(APIError):
@@ -105,6 +123,17 @@ class RateLimitError(APIError):
         )
 
 
+class NotImplementedError(APIError):
+    """Feature not implemented."""
+
+    def __init__(self, message: str = "Feature not implemented"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            error_code="NOT_IMPLEMENTED",
+        )
+
+
 def setup_error_handlers(app: FastAPI) -> None:
     """
     Register global error handlers.
@@ -134,11 +163,50 @@ def setup_error_handlers(app: FastAPI) -> None:
         }
 
         # Add details for validation errors
-        if isinstance(exc, RequestValidationError) and hasattr(exc, "details") and exc.details:
+        if isinstance(exc, DomainValidationError) and hasattr(exc, "details") and exc.details:
             response_data["error"]["details"] = exc.details
+
+        # Add request_id if available (for log correlation)
+        # TODO: Generate request_id in middleware when ready
+        request_id = getattr(request.state, "request_id", None)
+        if request_id:
+            response_data["error"]["request_id"] = request_id
 
         return JSONResponse(
             status_code=exc.status_code,
+            content=response_data,
+        )
+
+    @app.exception_handler(FastAPIRequestValidationError)
+    async def fastapi_request_validation_error_handler(
+        request: Request, exc: FastAPIRequestValidationError
+    ) -> JSONResponse:
+        """
+        Handle FastAPI request validation errors.
+
+        FastAPI raises this for invalid request bodies, query params, path params.
+        Transforms into our API error format.
+        """
+        details: dict[str, str] = {}
+        for err in exc.errors():
+            field = ".".join(str(loc) for loc in err.get("loc", []))
+            details[field] = err.get("msg", "Invalid value")
+
+        response_data = {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed",
+                "details": details,
+            }
+        }
+
+        # Add request_id if available
+        request_id = getattr(request.state, "request_id", None)
+        if request_id:
+            response_data["error"]["request_id"] = request_id
+
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=response_data,
         )
 
@@ -149,23 +217,30 @@ def setup_error_handlers(app: FastAPI) -> None:
         """
         Handle Pydantic validation errors.
 
-        Transforms Pydantic ValidationError into our API error format.
+        Used for internal schema validation (not HTTP requests).
+        FastAPI requests are handled by FastAPIRequestValidationError above.
         """
-        errors = exc.errors()
-        details = {}
-        for error in errors:
-            field = ".".join(str(loc) for loc in error["loc"])
-            details[field] = error["msg"]
+        details: dict[str, str] = {}
+        for error in exc.errors():
+            field = ".".join(str(loc) for loc in error.get("loc", []))
+            details[field] = error.get("msg", "Invalid value")
+
+        response_data = {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Validation failed",
+                "details": details,
+            }
+        }
+
+        # Add request_id if available
+        request_id = getattr(request.state, "request_id", None)
+        if request_id:
+            response_data["error"]["request_id"] = request_id
 
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "Request validation failed",
-                    "details": details,
-                }
-            },
+            content=response_data,
         )
 
     @app.exception_handler(Exception)
@@ -173,16 +248,37 @@ def setup_error_handlers(app: FastAPI) -> None:
         """
         Catch-all for unexpected errors.
 
-        In production, log full exception details but return generic message.
+        Logs full exception details but returns generic message to client.
         Never expose stack traces or internal details to clients.
         """
-        # TODO: Log full exception details to Sentry
+        # Log exception with full details (never expose details to client)
+        settings = get_settings()
+        log_extra = {
+            "path": request.url.path,
+            "method": request.method,
+        }
+        
+        if settings.ENV == "local":
+            # Keep it loud and obvious while developing
+            logger.exception("Unhandled exception (local)", extra=log_extra, exc_info=exc)
+        else:
+            logger.exception("Unhandled exception", extra=log_extra, exc_info=exc)
+
+        # TODO: Send to Sentry when configured
+
+        response_data = {
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred",
+            }
+        }
+
+        # Add request_id if available (for log correlation)
+        request_id = getattr(request.state, "request_id", None)
+        if request_id:
+            response_data["error"]["request_id"] = request_id
+
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "error": {
-                    "code": "INTERNAL_ERROR",
-                    "message": "An unexpected error occurred",
-                }
-            },
+            content=response_data,
         )

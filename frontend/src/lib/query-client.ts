@@ -10,14 +10,16 @@ import { QueryClient } from '@tanstack/react-query'
 export const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            // Stale time: data is considered fresh for 30 seconds
-            staleTime: 30 * 1000,
-            // Cache time: unused data stays in cache for 5 minutes
-            gcTime: 5 * 60 * 1000,
-            // Retry failed requests once
-            retry: 1,
-            // Refetch on window focus in production
+            staleTime: 30 * 1000, // 30s freshness
+            gcTime: 5 * 60 * 1000, // 5 min cache
+            throwOnError: false, // Let UI decide how to show failures
+            retry: (failureCount, error: any) => {
+                // Don't retry 4xx errors (validation/auth errors)
+                if (error?.code?.startsWith?.('4')) return false
+                return failureCount < 1
+            },
             refetchOnWindowFocus: import.meta.env.PROD,
+            networkMode: 'online', // Explicit network mode for flaky connections
         },
     },
 })

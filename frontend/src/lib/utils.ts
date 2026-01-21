@@ -12,6 +12,4 @@ import { twMerge } from 'tailwind-merge'
  *
  * Used for conditional class names and component composition.
  */
-export function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs))
-}
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))

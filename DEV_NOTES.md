@@ -57,6 +57,21 @@ This file contains development context, decisions, and notes for the ASASelfHost
 - Note any deviations from original architecture
 - Record trade-offs and reasoning
 
+### Git Commit Reminders
+**IMPORTANT:** After making large changes or multiple file edits, prompt to commit:
+- After completing a major step/feature
+- After editing 5+ files
+- After implementing a new component/endpoint
+- After database schema changes
+- At natural stopping points in development
+
+**Commit workflow:**
+1. `git add .` - Stage changes
+2. `git commit -m "Descriptive message"` - Create local backup
+3. `git push` - Upload to GitHub
+
+Always remind to commit after significant work to prevent data loss.
+
 ---
 
 ## Official Decisions (Override Any Doc Mismatches)

@@ -26,4 +26,6 @@ async def stripe_webhook(request: Request):
     # TODO: Check idempotency (event ID) to prevent duplicate processing
     # TODO: Process webhook events (subscription.created, subscription.updated, etc.)
     # TODO: Update subscriptions table
-    pass
+    from app.core.errors import DomainValidationError
+
+    raise DomainValidationError("Stripe webhook handler not yet implemented")

@@ -1,19 +1,21 @@
 """
-Rate limiting middleware and utilities.
+Rate limiting utilities.
 
-Scaffold for rate limiting with in-memory dev limiter.
-TODO: Replace with Redis-based limiter in production.
+In-memory rate limiting for development.
+TODO: Replace with Redis-based rate limiting for production.
+
+Note: This in-memory limiter is not safe under multiple workers/instances/reloads.
+That's fine for scaffolding, but not production-ready.
 """
 
 import time
 from collections import defaultdict
 from typing import Callable
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from fastapi import Request
 
-from app.core.config import settings
-from app.core.errors import APIError
+from app.core.config import get_settings
+from app.core.errors import RateLimitError
 
 
 class RateLimiter:
@@ -51,11 +53,15 @@ class RateLimiter:
         Check if request is within rate limit.
 
         Returns True if allowed, False if rate limited.
+
+        Rate limiting is enabled in production by default.
+        In local/dev, it's disabled unless RATE_LIMIT_ENABLED=True.
         """
-        if not settings.DEBUG:  # Only enable in non-debug mode
-            # In debug/local, rate limiting is optional
-            if not getattr(settings, "RATE_LIMIT_ENABLED", False):
-                return True
+        # Enable in production by default, optional in local/dev
+        settings = get_settings()
+        enabled = True if settings.ENV == "production" else settings.RATE_LIMIT_ENABLED
+        if not enabled:
+            return True
 
         now = time.time()
         cutoff = now - window_sec
@@ -92,13 +98,14 @@ def get_rate_limit_key(request: Request, identifier: str | None = None) -> str:
     Generate rate limit key from request.
 
     Uses IP address by default, or custom identifier if provided.
+    Key format: rl:<type>:<identifier>
     """
     if identifier:
-        return f"rate_limit:{identifier}"
+        return f"rl:{identifier}"
 
     # Use client IP
     client_ip = request.client.host if request.client else "unknown"
-    return f"rate_limit:ip:{client_ip}"
+    return f"rl:ip:{client_ip}"
 
 
 def rate_limit(
@@ -126,11 +133,7 @@ def rate_limit(
             key = get_rate_limit_key(request)
 
         if not _rate_limiter.check(key, limit, window_sec):
-            raise APIError(
-                message="Rate limit exceeded",
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                error_code="RATE_LIMIT_EXCEEDED",
-            )
+            raise RateLimitError()
 
     return rate_limit_dependency
 
@@ -140,11 +143,7 @@ def public_get_rate_limit(request: Request):
     """120 requests per minute per IP for public GET endpoints."""
     key = get_rate_limit_key(request)
     if not _rate_limiter.check(key, limit=120, window_sec=60):
-        raise APIError(
-            message="Rate limit exceeded",
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            error_code="RATE_LIMIT_EXCEEDED",
-        )
+        raise RateLimitError()
 
 
 def auth_user_rate_limit(request: Request):
@@ -156,25 +155,17 @@ def auth_user_rate_limit(request: Request):
         # Fall back to IP if no user
         key = get_rate_limit_key(request)
     else:
-        key = f"rate_limit:user:{user.user_id}"
+        key = f"rl:user:{user.user_id}"
 
     if not _rate_limiter.check(key, limit=60, window_sec=60):
-        raise APIError(
-            message="Rate limit exceeded",
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            error_code="RATE_LIMIT_EXCEEDED",
-        )
+        raise RateLimitError()
 
 
 def heartbeat_rate_limit(request: Request, server_id: str):
     """12 requests per minute per server for heartbeat ingestion."""
-    key = f"rate_limit:heartbeat:server:{server_id}"
+    key = f"rl:hb:{server_id}"
     if not _rate_limiter.check(key, limit=12, window_sec=60):
-        raise APIError(
-            message="Rate limit exceeded",
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            error_code="RATE_LIMIT_EXCEEDED",
-        )
+        raise RateLimitError()
 
 
 # TODO: Replace in-memory limiter with Redis-based solution for production

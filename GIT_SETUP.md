@@ -47,4 +47,22 @@ Upload your code to GitHub safely.
 
 ---
 
+## Commit Reminders
+
+**After significant changes, always commit:**
+- After completing a major step/feature
+- After editing 5+ files
+- After implementing new components/endpoints
+- After database schema changes
+- At natural stopping points
+
+**Quick commit commands:**
+```bash
+git add .
+git commit -m "Description of changes"
+git push
+```
+
+---
+
 *Follow the steps in order. If you're unsure, stop and ask.*

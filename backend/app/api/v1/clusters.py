@@ -30,7 +30,9 @@ async def get_cluster(cluster_id: str):
     Get cluster details by ID.
     """
     # TODO: Implement cluster retrieval
-    pass
+    from app.core.errors import NotFoundError
+
+    raise NotFoundError("cluster", cluster_id)
 
 
 @router.post("/")
@@ -43,4 +45,6 @@ async def create_cluster():
     - Cluster owner consent
     """
     # TODO: Implement cluster creation
-    pass
+    from app.core.errors import DomainValidationError
+
+    raise DomainValidationError("Cluster creation not yet implemented")
