@@ -134,6 +134,42 @@ class NotImplementedError(APIError):
         )
 
 
+class SignatureVerificationError(APIError):
+    """Invalid Ed25519 signature."""
+
+    def __init__(self, message: str = "Invalid signature"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            error_code="SIGNATURE_INVALID",
+        )
+
+
+class KeyVersionMismatchError(APIError):
+    """Key version mismatch."""
+
+    def __init__(self, expected: int, received: int):
+        super().__init__(
+            message=f"Key version mismatch: expected {expected}, received {received}",
+            status_code=status.HTTP_409_CONFLICT,
+            error_code="KEY_VERSION_MISMATCH",
+        )
+        self.expected = expected
+        self.received = received
+
+
+class HeartbeatReplayError(APIError):
+    """Duplicate heartbeat_id detected."""
+
+    def __init__(self, heartbeat_id: str):
+        super().__init__(
+            message=f"Replay detected: heartbeat_id {heartbeat_id}",
+            status_code=status.HTTP_409_CONFLICT,
+            error_code="HEARTBEAT_REPLAY",
+        )
+        self.heartbeat_id = heartbeat_id
+
+
 def setup_error_handlers(app: FastAPI) -> None:
     """
     Register global error handlers.

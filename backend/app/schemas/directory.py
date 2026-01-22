@@ -41,7 +41,10 @@ class DirectoryServer(BaseSchema):
     """
     Directory server response schema.
 
-    This matches the directory_view output exactly.
+    The directory_view provides the persisted fields from the database.
+    The backend adds computed rank fields (rank_position, rank_delta_24h, rank_by)
+    and legacy field aliases (players_max, uptime_24h, rank, is_PC).
+    
     All directory endpoints should return this schema.
     Frontend TypeScript type must match this structure.
     """
@@ -68,6 +71,13 @@ class DirectoryServer(BaseSchema):
     # Status (effective status from servers table)
     effective_status: ServerStatus
     status_source: StatusSource | None = None  # None is valid (unknown source)
+    # Note: status_source and is_verified are independent:
+    # - status_source: Where the status came from (manual entry vs agent detection)
+    # - is_verified: Listing trust flag (curated/verified listing, regardless of status source)
+    # Examples:
+    #   - status_source="manual" + is_verified=True = Manually entered status, but listing is verified/curated
+    #   - status_source="agent" + is_verified=True = Agent-detected status, listing is verified/curated
+    #   - status_source="manual" + is_verified=False = Manually entered status, listing not verified
     last_seen_at: datetime | None = None
     confidence: Confidence | None = None  # RYG logic in Sprint 2
 

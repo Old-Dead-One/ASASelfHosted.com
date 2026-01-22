@@ -37,6 +37,37 @@ class SupabaseDirectoryRepository(DirectoryRepository):
     Fails fast if Supabase is not configured.
     """
 
+    @staticmethod
+    def _normalize_array_field(value: str | list | None) -> list:
+        """
+        Normalize Postgres array fields to Python lists.
+        
+        Handles cases where Supabase/PostgREST returns arrays as:
+        - JSON arrays (list): return as-is
+        - Postgres array strings ("{value1,value2}"): parse to list
+        - None: return empty list
+        """
+        if value is None:
+            return []
+        
+        if isinstance(value, list):
+            return value
+        
+        if isinstance(value, str):
+            # Handle Postgres array string format: "{value1,value2}"
+            if value.startswith("{") and value.endswith("}"):
+                # Remove braces and split by comma
+                inner = value.strip("{}")
+                if not inner:
+                    return []
+                # Split and clean up values
+                return [v.strip().strip('"') for v in inner.split(",") if v.strip()]
+            # If it's a plain string, wrap it in a list
+            return [value] if value else []
+        
+        # Fallback: try to convert to list
+        return list(value) if value else []
+
     def __init__(self):
         settings = get_settings()
         
@@ -299,12 +330,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # Formula: (page - 1) * page_size + idx + 1
                 rank_position = (page - 1) * page_size + idx + 1
 
-                # Ensure mod_list and platforms are never None (view should handle this, but safety check)
-                # DirectoryServer requires list, not Optional
-                if row.get("mod_list") is None:
-                    row["mod_list"] = []
-                if row.get("platforms") is None:
-                    row["platforms"] = []
+                # Normalize array fields (handle Postgres array string format if needed)
+                # DirectoryServer requires list, not Optional or string
+                row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
+                row["platforms"] = self._normalize_array_field(row.get("platforms"))
 
                 # Create DirectoryServer with rank fields
                 server = DirectoryServer(
@@ -374,11 +403,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
             # Convert to DirectoryServer
             row = data[0]
-            # Ensure mod_list and platforms are never None (view should handle this, but safety check)
-            if row.get("mod_list") is None:
-                row["mod_list"] = []
-            if row.get("platforms") is None:
-                row["platforms"] = []
+            # Normalize array fields (handle Postgres array string format if needed)
+            # DirectoryServer requires list, not Optional or string
+            row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
+            row["platforms"] = self._normalize_array_field(row.get("platforms"))
             # Set rank fields for consistency (rank_position=None for single fetch is fine)
             server = DirectoryServer(
                 **row,

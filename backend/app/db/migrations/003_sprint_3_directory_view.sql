@@ -130,7 +130,11 @@ CREATE INDEX IF NOT EXISTS idx_favorites_server_id ON favorites(server_id);
 -- DIRECTORY_VIEW UPDATE
 -- ============================================================================
 
-CREATE OR REPLACE VIEW directory_view AS
+-- Drop existing view first to avoid column rename conflicts
+-- (PostgreSQL interprets column position changes as renames)
+DROP VIEW IF EXISTS directory_view;
+
+CREATE VIEW directory_view AS
 SELECT
     s.id,
     s.name,
@@ -211,4 +215,4 @@ COMMENT ON COLUMN servers.is_verified IS 'Listing verification/trust flag (NOT N
 COMMENT ON COLUMN servers.players_current IS 'Current player count (nullable, updated from heartbeats)';
 COMMENT ON COLUMN servers.quality_score IS 'Computed quality score 0-100 (nullable, populated by agent pipeline)';
 COMMENT ON COLUMN servers.uptime_percent IS 'Uptime percentage 0-100 (nullable, populated by agent pipeline)';
-COMMENT ON VIEW directory_view IS 'Public read model for directory - matches DirectoryServer schema (excludes rank_position/rank_delta_24h computed in backend)';
+COMMENT ON VIEW directory_view IS 'Public read model for directory - provides persisted fields for DirectoryServer schema. Backend adds computed rank fields (rank_position, rank_delta_24h, rank_by) and legacy aliases.';

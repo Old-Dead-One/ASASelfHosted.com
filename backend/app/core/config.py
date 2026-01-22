@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = False
 
+    # Heartbeat grace window (seconds)
+    HEARTBEAT_GRACE_SECONDS: int = 600  # 10 minutes default
+    HEARTBEAT_GRACE_MIN: int = 60  # 1 minute minimum
+    HEARTBEAT_GRACE_MAX: int = 3600  # 1 hour maximum
+
+    # Worker configuration
+    HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: int = 5  # Poll interval for worker
+    HEARTBEAT_JOB_BATCH_SIZE: int = 50  # Batch size for job processing
+    HEARTBEAT_HISTORY_LIMIT: int = 500  # Max heartbeats to fetch per server
+    HEARTBEAT_UPTIME_WINDOW_HOURS: int = 24  # Uptime calculation window
+
     def validate_non_local(self) -> None:
         """
         Validate required config for non-local environments.

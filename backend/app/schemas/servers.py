@@ -8,7 +8,7 @@ from app.schemas.base import BaseSchema
 from app.schemas.directory import DirectoryServer
 
 # Type aliases for clarity
-# Public responses use DirectoryServer (matches directory_view)
+# Public responses use DirectoryServer (directory_view provides persisted fields; backend adds rank fields)
 ServerPublicResponse = DirectoryServer
 
 # Owner responses also use DirectoryServer for now

@@ -107,6 +107,21 @@ def create_app() -> FastAPI:
     async def health_check():
         return {"status": "ok"}
 
+    # Start heartbeat worker on app startup (optional - can also run as separate process)
+    @app.on_event("startup")
+    async def start_heartbeat_worker_background():
+        """Start heartbeat worker as background task."""
+        try:
+            from app.workers.heartbeat_worker import process_heartbeat_jobs
+            import asyncio
+            
+            # Start worker loop as background task (non-blocking)
+            asyncio.create_task(process_heartbeat_jobs())
+            logger.info("Heartbeat worker started as background task")
+        except Exception as e:
+            # Non-fatal - worker can be started separately if needed
+            logger.warning(f"Failed to start heartbeat worker (non-fatal): {e}")
+
     return app
 
 
