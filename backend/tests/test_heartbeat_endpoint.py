@@ -94,9 +94,20 @@ def test_heartbeat_success(client, test_key_pair):
 
 
 def test_heartbeat_replay_detection(client, test_key_pair):
-    """Test that duplicate heartbeat_id returns 202 with replay=True."""
+    """Test that duplicate heartbeat_id returns 202 with replay=True (idempotent)."""
     # This would require:
     # - Insert first heartbeat
-    # - Send same heartbeat_id again
-    # - Assert 202 with replay=True (idempotent)
+    # - Send same heartbeat_id again (same server_id)
+    # - Assert 202 with replay=True (idempotent, not an error)
+    pass
+
+
+def test_heartbeat_clock_skew_boundary(client, test_key_pair):
+    """Test clock skew boundary conditions (exactly grace window ±1s)."""
+    # This would require:
+    # - Test timestamp exactly at grace window boundary
+    # - Test timestamp 1s beyond grace window (should reject)
+    # - Test timestamp 1s before grace window (should accept)
+    # - Test timestamp exactly +60s in future (should reject)
+    # - Test timestamp exactly +59s in future (should accept)
     pass

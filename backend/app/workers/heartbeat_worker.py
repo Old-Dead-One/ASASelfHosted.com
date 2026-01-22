@@ -81,6 +81,18 @@ async def process_heartbeat_jobs(
                         limit=settings.HEARTBEAT_HISTORY_LIMIT
                     )
                     
+                    # Only update derived state if agent heartbeats exist
+                    # If no heartbeats, respect manual status (don't override)
+                    if not heartbeats:
+                        # No agent heartbeats - mark processed but don't update derived state
+                        # This preserves manual status_source and effective_status
+                        await jobs_repo.mark_processed(job["id"], datetime.now(timezone.utc))
+                        logger.debug(
+                            f"Job processed: no agent heartbeats (preserving manual status)",
+                            extra={"job_id": job["id"], "server_id": job["server_id"]}
+                        )
+                        continue
+                    
                     # Get grace window
                     grace_window = get_grace_window_seconds(cluster_info["heartbeat_grace_seconds"])
                     

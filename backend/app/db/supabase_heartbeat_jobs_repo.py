@@ -107,9 +107,14 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
 
     async def claim_jobs(self, batch_size: int) -> list[HeartbeatJob]:
         """
-        Claim pending jobs for processing.
+        Claim pending jobs for processing using row-level claiming.
         
-        Selects pending jobs ordered by enqueued_at, increments attempts immediately (claiming).
+        Uses claimed_at timestamp for idempotent claiming:
+        - Only claims jobs where claimed_at IS NULL (unclaimed)
+        - Sets claimed_at = NOW() atomically
+        - Prevents multiple workers from processing the same job
+        
+        This ensures single-processor guarantee even with multiple Uvicorn workers.
         """
         if not self._configured:
             error_msg = "SupabaseHeartbeatJobsRepository not configured"
@@ -121,11 +126,18 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
             raise RuntimeError("Supabase admin client not initialized")
 
         try:
-            # Select pending jobs ordered by enqueued_at
+            from datetime import datetime, timezone
+            
+            # Row-level claiming: atomically claim unclaimed pending jobs
+            # This prevents multiple workers from claiming the same job
+            now = datetime.now(timezone.utc)
+            
+            # First, select unclaimed pending jobs
             response = (
                 self._supabase.table("heartbeat_jobs")
                 .select("id,server_id,enqueued_at,processed_at,attempts,last_error")
                 .is_("processed_at", "null")
+                .is_("claimed_at", "null")
                 .order("enqueued_at", desc=False)
                 .limit(batch_size)
                 .execute()
@@ -133,16 +145,29 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
             
             jobs_data = response.data if hasattr(response, "data") else []
             
-            # Claim jobs by incrementing attempts
+            # Claim jobs atomically by setting claimed_at
             claimed_jobs: list[HeartbeatJob] = []
             for job_data in jobs_data:
                 job_id = job_data["id"]
                 current_attempts = job_data.get("attempts", 0)
                 
-                # Increment attempts (claim the job)
-                self._supabase.table("heartbeat_jobs").update({
-                    "attempts": current_attempts + 1
-                }).eq("id", job_id).execute()
+                # Atomically claim the job (set claimed_at, increment attempts)
+                # If another worker already claimed it, this update will affect 0 rows
+                update_response = (
+                    self._supabase.table("heartbeat_jobs")
+                    .update({
+                        "claimed_at": now.isoformat(),
+                        "attempts": current_attempts + 1
+                    })
+                    .eq("id", job_id)
+                    .is_("claimed_at", "null")  # Only update if still unclaimed
+                    .execute()
+                )
+                
+                # Check if we actually claimed it (another worker might have claimed it first)
+                if not update_response.data:
+                    # Job was already claimed by another worker - skip it
+                    continue
                 
                 # Parse datetime fields
                 enqueued_at = datetime.fromisoformat(job_data["enqueued_at"].replace("Z", "+00:00"))

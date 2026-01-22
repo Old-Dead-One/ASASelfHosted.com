@@ -56,8 +56,13 @@ class SupabaseHeartbeatRepository(HeartbeatRepository):
         """
         Insert heartbeat append-only with replay detection.
         
-        Handles unique constraint violation on (server_id, heartbeat_id) as replay.
-        Normalizes players fields (both canonical and legacy for compatibility).
+        Replay detection via UNIQUE(server_id, heartbeat_id) constraint:
+        - Same heartbeat_id, same server → idempotent (returns replay=True)
+        - Same heartbeat_id, different server → rejected (DB constraint violation)
+        
+        Normalizes players fields: canonical fields (players_current, players_capacity)
+        are the source of truth. Legacy fields (player_count, max_players) are set
+        for compatibility but should not be read by engines.
         """
         if not self._configured:
             error_msg = "SupabaseHeartbeatRepository not configured"
@@ -105,8 +110,12 @@ class SupabaseHeartbeatRepository(HeartbeatRepository):
             error_str = str(e).lower()
             
             # Check for unique constraint violation (replay)
+            # UNIQUE(server_id, heartbeat_id) ensures:
+            # - Same server_id + same heartbeat_id → replay (idempotent)
+            # - Different server_id + same heartbeat_id → rejected (should never happen, but DB enforces)
             if "unique" in error_str or "duplicate" in error_str or "uq_heartbeats_server_heartbeat_id" in error_str:
                 # Replay detected - heartbeat_id already exists for this server
+                # This is idempotent: same heartbeat_id for same server is safe to ignore
                 return HeartbeatCreateResult(inserted=False, replay=True)
             
             # Other error - re-raise

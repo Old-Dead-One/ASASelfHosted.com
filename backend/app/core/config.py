@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     """
 
     # Environment (strict type prevents typos like "prod" instead of "production")
-    ENV: Literal["local", "development", "staging", "production"] = "local"
+    ENV: Literal["local", "development", "staging", "production", "test"] = "local"
     DEBUG: bool = False
 
     # API
@@ -35,9 +35,10 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     # Supabase (optional for development scaffolding)
-    SUPABASE_URL: str = ""
-    SUPABASE_ANON_KEY: str = ""  # Public anon key (if needed for client-side)
-    SUPABASE_SERVICE_ROLE_KEY: str = ""  # Service role key (backend only; use sparingly)
+    # Default to None so tests don't accidentally try to connect
+    SUPABASE_URL: str | None = None
+    SUPABASE_ANON_KEY: str | None = None  # Public anon key (if needed for client-side)
+    SUPABASE_SERVICE_ROLE_KEY: str | None = None  # Service role key (backend only; use sparingly)
 
     # JWT verification (JWKS-based, not secret-based)
     SUPABASE_JWT_ISSUER: str = ""  # https://<project-ref>.supabase.co/auth/v1

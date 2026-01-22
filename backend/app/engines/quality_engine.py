@@ -74,7 +74,7 @@ def compute_quality_score(
     # Sum components
     quality_score = uptime_component + activity_component + confidence_component
     
-    # Clamp to 0-100
+    # Clamp to 0-100 (required: output must be in valid range)
     quality_score = max(0.0, min(100.0, quality_score))
     
     return quality_score

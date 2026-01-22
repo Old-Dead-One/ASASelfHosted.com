@@ -5,7 +5,9 @@ API-first architecture with consent-first design.
 Backend enforces rules, not UI.
 """
 
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as v1_router
 from app.core.config import get_settings
 from app.core.errors import setup_error_handlers
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI app.
+    
+    Handles startup and shutdown events.
+    Replaces deprecated @app.on_event("startup") pattern.
+    """
+    # Startup
+    logger = logging.getLogger("asaselfhosted.startup")
+    try:
+        from app.workers.heartbeat_worker import process_heartbeat_jobs
+        
+        # Start heartbeat worker as background task (non-blocking)
+        asyncio.create_task(process_heartbeat_jobs())
+        logger.info("Heartbeat worker started as background task")
+    except Exception as e:
+        # Non-fatal - worker can be started separately if needed
+        logger.warning(f"Failed to start heartbeat worker (non-fatal): {e}")
+    
+    yield  # App runs here
+    
+    # Shutdown (if needed in future)
+    # Currently no cleanup needed, but this is where it would go
 
 
 def create_app() -> FastAPI:
@@ -65,6 +93,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if settings.ENV != "production" else None,
         redoc_url="/redoc" if settings.ENV != "production" else None,
+        lifespan=lifespan,  # Use lifespan handler instead of deprecated on_event
     )
 
     # CORS configuration
@@ -106,21 +135,6 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         return {"status": "ok"}
-
-    # Start heartbeat worker on app startup (optional - can also run as separate process)
-    @app.on_event("startup")
-    async def start_heartbeat_worker_background():
-        """Start heartbeat worker as background task."""
-        try:
-            from app.workers.heartbeat_worker import process_heartbeat_jobs
-            import asyncio
-            
-            # Start worker loop as background task (non-blocking)
-            asyncio.create_task(process_heartbeat_jobs())
-            logger.info("Heartbeat worker started as background task")
-        except Exception as e:
-            # Non-fatal - worker can be started separately if needed
-            logger.warning(f"Failed to start heartbeat worker (non-fatal): {e}")
 
     return app
 

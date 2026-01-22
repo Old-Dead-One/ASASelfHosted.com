@@ -19,11 +19,15 @@ def compute_effective_status(
     Compute effective_status from heartbeat history.
     
     Rules:
-    - No heartbeats → unknown
+    - No heartbeats → unknown (does NOT override manual status if set)
     - Latest received_at within grace window → online
     - Otherwise → offline
     
     Uses received_at (server-trusted clock) for liveness.
+    
+    Note: If no agent heartbeats exist, this returns "unknown" but does not
+    override a manually-set effective_status. The worker should only update
+    effective_status if agent heartbeats exist (status_source='agent').
     
     Args:
         server_id: Server UUID (for logging/debugging)
@@ -34,7 +38,9 @@ def compute_effective_status(
         Tuple of (effective_status, last_seen_at datetime or None)
     """
     if not heartbeats:
-        # Never seen → unknown
+        # Never seen by agent → unknown
+        # Note: This does not override manual status - worker should only update
+        # effective_status when status_source='agent' (i.e., when heartbeats exist)
         return "unknown", None
     
     # Get most recent heartbeat

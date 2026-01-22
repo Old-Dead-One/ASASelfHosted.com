@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS heartbeat_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     server_id UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
     enqueued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    claimed_at TIMESTAMPTZ NULL,  -- Row-level claiming: set when worker claims job
     processed_at TIMESTAMPTZ NULL,
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT NULL,
@@ -125,10 +126,15 @@ CREATE INDEX IF NOT EXISTS idx_clusters_heartbeat_grace
     ON clusters(heartbeat_grace_seconds) 
     WHERE heartbeat_grace_seconds IS NOT NULL;
 
--- Index for worker polling (pending jobs ordered by enqueued_at)
+-- Index for worker polling (unclaimed pending jobs ordered by enqueued_at)
 CREATE INDEX IF NOT EXISTS idx_heartbeat_jobs_pending 
     ON heartbeat_jobs(processed_at, enqueued_at) 
-    WHERE processed_at IS NULL;
+    WHERE processed_at IS NULL AND claimed_at IS NULL;
+
+-- Index for claimed jobs (for monitoring/debugging)
+CREATE INDEX IF NOT EXISTS idx_heartbeat_jobs_claimed 
+    ON heartbeat_jobs(claimed_at) 
+    WHERE claimed_at IS NOT NULL AND processed_at IS NULL;
 
 -- Keep existing index (already in Sprint 0)
 -- idx_heartbeats_server_received on (server_id, received_at DESC)

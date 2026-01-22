@@ -4,7 +4,11 @@ Heartbeat utility functions.
 Grace window resolution and heartbeat processing helpers.
 """
 
+import logging
+
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_grace_window_seconds(cluster_override: int | None) -> int:

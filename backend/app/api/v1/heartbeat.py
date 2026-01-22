@@ -165,18 +165,21 @@ async def ingest_heartbeat(
             detail=f"Heartbeat timestamp is stale (delta: {time_delta:.0f}s, grace: {grace_window}s)"
         )
     
-    # Reject if > 60s in future
+    # Reject if > 60s in future (clock skew violation)
     if time_delta < -60:
         logger.warning(
-            f"Heartbeat rejected: timestamp too far in future",
+            f"Heartbeat rejected: clock skew violation (timestamp too far in future)",
             extra={
                 "server_id": heartbeat.server_id,
-                "delta_seconds": time_delta
+                "delta_seconds": time_delta,
+                "agent_timestamp": heartbeat_timestamp.isoformat(),
+                "server_timestamp": now.isoformat(),
+                "agent_version": heartbeat.agent_version
             }
         )
         raise HTTPException(
             status_code=400,
-            detail=f"Heartbeat timestamp is too far in future (delta: {time_delta:.0f}s)"
+            detail=f"Heartbeat timestamp is too far in future (clock skew: {time_delta:.0f}s). Agent clock may be incorrect."
         )
     
     # 7. Insert heartbeat (append-only)

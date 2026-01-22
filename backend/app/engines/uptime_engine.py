@@ -30,6 +30,10 @@ def compute_uptime_percent(
     - Merge overlapping intervals
     - Compute: (minutes_online / total_minutes_in_window) * 100
     
+    Known limitation: Gaps between heartbeats (beyond grace_window_seconds) are
+    assumed to be offline. This is conservative and may underestimate uptime for
+    servers with irregular heartbeat intervals.
+    
     Start with 24h window only (Sprint 4).
     
     Args:

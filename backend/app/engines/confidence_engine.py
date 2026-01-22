@@ -4,10 +4,13 @@ Confidence engine.
 Computes RYG confidence from heartbeat consistency and agent signals.
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import Literal
 
 from app.db.servers_derived_repo import Heartbeat
+
+logger = logging.getLogger(__name__)
 
 
 def compute_confidence(
@@ -46,18 +49,46 @@ def compute_confidence(
     
     # Red: stale beyond 2*grace
     if time_since_latest > (2 * grace_window_seconds):
+        reason = "stale"
+        logger.debug(
+            f"Confidence: red ({reason})",
+            extra={
+                "server_id": server_id,
+                "time_since_latest": time_since_latest,
+                "grace_window": grace_window_seconds
+            }
+        )
         return "red"
     
     # Check sample count (need at least 3 heartbeats for green)
     sample_count = len(heartbeats)
     if sample_count < 3:
         # Insufficient samples → yellow (new/intermittent)
+        reason = "insufficient_samples"
+        logger.debug(
+            f"Confidence: yellow ({reason})",
+            extra={"server_id": server_id, "sample_count": sample_count}
+        )
         return "yellow"
     
     # Check if within grace window
     if time_since_latest <= grace_window_seconds:
         # Within grace + enough samples → green (consistent)
+        reason = "consistent"
+        logger.debug(
+            f"Confidence: green ({reason})",
+            extra={"server_id": server_id, "sample_count": sample_count}
+        )
         return "green"
     else:
         # Within 2*grace but beyond grace → yellow (intermittent)
+        reason = "intermittent"
+        logger.debug(
+            f"Confidence: yellow ({reason})",
+            extra={
+                "server_id": server_id,
+                "time_since_latest": time_since_latest,
+                "grace_window": grace_window_seconds
+            }
+        )
         return "yellow"
