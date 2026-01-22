@@ -35,6 +35,33 @@ Creates:
 3. Execute in SQL Editor
 4. Verify tables and policies in Database → Tables
 
+### `003_sprint_3_directory_view.sql`
+**Sprint 3 - Directory Filtering & Ranking Foundation**
+
+Extends Sprint 0 schema with:
+- Enum types: `ruleset`, `game_mode`, `platform`
+- New columns on `servers` table:
+  - Stored metadata: `ruleset`, `game_mode`, `platforms`, `players_capacity`, `is_official_plus`, `is_crossplay`, `is_console`, `is_pc`, `is_verified`
+  - Dynamic metrics (nullable): `players_current`, `quality_score`, `uptime_percent`
+- Updated `directory_view` with all DirectoryServer fields (excluding rank_position/rank_delta_24h computed in backend)
+- Performance indexes for filtering and sorting
+
+**Key Changes:**
+- `is_verified` is a real boolean column (NOT NULL DEFAULT FALSE), separate from `status_source`
+- `platforms` is `platform[]` enum array (NOT NULL DEFAULT empty array)
+- `mod_list` remains `text[]` in view for clean Supabase filtering
+- Composite index `(updated_at DESC, id ASC)` for stable sorting
+
+**To Run:**
+1. Ensure `001_sprint_0_schema.sql` has been applied first
+2. Open Supabase Dashboard → SQL Editor
+3. Copy contents of `003_sprint_3_directory_view.sql`
+4. Execute in SQL Editor
+5. Verify:
+   - New columns exist in `servers` table
+   - `directory_view` has been updated
+   - Indexes have been created
+
 ## Schema Decisions
 
 ### Status Model
