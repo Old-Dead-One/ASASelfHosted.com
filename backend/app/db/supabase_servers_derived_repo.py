@@ -155,6 +155,44 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
         except Exception as e:
             raise RuntimeError(f"Failed to get recent heartbeats for {server_id}: {str(e)}") from e
 
+    async def get_current_anomaly_state(self, server_id: str) -> tuple[bool | None, datetime | None]:
+        """
+        Get current anomaly state for a server.
+        
+        Returns:
+            Tuple of (anomaly_players_spike: bool | None, anomaly_last_detected_at: datetime | None)
+        """
+        if not self._configured or self._supabase is None:
+            raise RuntimeError("SupabaseServersDerivedRepository not configured")
+
+        try:
+            response = (
+                self._supabase.table("servers")
+                .select("anomaly_players_spike,anomaly_last_detected_at")
+                .eq("id", server_id)
+                .limit(1)
+                .execute()
+            )
+            
+            data = response.data if hasattr(response, "data") else []
+            if not data:
+                return None, None
+            
+            row = data[0]
+            anomaly_flag = row.get("anomaly_players_spike")
+            anomaly_at_str = row.get("anomaly_last_detected_at")
+            
+            anomaly_at = None
+            if anomaly_at_str:
+                anomaly_at = datetime.fromisoformat(anomaly_at_str.replace("Z", "+00:00"))
+                if anomaly_at.tzinfo is None:
+                    anomaly_at = anomaly_at.replace(tzinfo=timezone.utc)
+            
+            return anomaly_flag, anomaly_at
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to get anomaly state for {server_id}: {str(e)}") from e
+
     async def update_derived_state(
         self,
         server_id: str,
@@ -175,6 +213,8 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
                 "players_capacity": state.get("players_capacity"),
                 "last_heartbeat_at": state.get("last_heartbeat_at").isoformat() if state.get("last_heartbeat_at") else None,
                 "status_source": "agent",  # Set status_source to 'agent' when updating from heartbeats
+                "anomaly_players_spike": state.get("anomaly_players_spike"),
+                "anomaly_last_detected_at": state.get("anomaly_last_detected_at").isoformat() if state.get("anomaly_last_detected_at") else None,
             }
             
             # Update servers table
@@ -182,3 +222,27 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
             
         except Exception as e:
             raise RuntimeError(f"Failed to update derived state for {server_id}: {str(e)}") from e
+
+    async def fast_path_update_from_heartbeat(
+        self,
+        server_id: str,
+        received_at: datetime,
+        heartbeat_timestamp: datetime,
+        players_current: int | None,
+        players_capacity: int | None,
+    ) -> None:
+        if not self._configured or self._supabase is None:
+            raise RuntimeError("SupabaseServersDerivedRepository not configured")
+
+        update_data = {
+            "last_seen_at": received_at.isoformat(),
+            "last_heartbeat_at": heartbeat_timestamp.isoformat(),
+            "status_source": "agent",
+            "effective_status": "online",  # worker may correct later
+        }
+        if players_current is not None:
+            update_data["players_current"] = players_current
+        if players_capacity is not None:
+            update_data["players_capacity"] = players_capacity
+
+        self._supabase.table("servers").update(update_data).eq("id", server_id).execute()

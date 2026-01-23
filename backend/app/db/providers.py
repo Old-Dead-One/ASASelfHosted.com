@@ -6,11 +6,13 @@ This keeps routes clean and makes environment-based switching trivial.
 """
 
 from app.core.config import get_settings
+from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.db.directory_repo import DirectoryRepository
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
 from app.db.servers_derived_repo import ServersDerivedRepository
+from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRepository
 from app.db.supabase_directory_repo import SupabaseDirectoryRepository
 from app.db.supabase_heartbeat_jobs_repo import SupabaseHeartbeatJobsRepository
 from app.db.supabase_heartbeat_repo import SupabaseHeartbeatRepository
@@ -21,6 +23,7 @@ _mock_repo = MockDirectoryRepository()
 
 # Reuse a single Supabase repo instance (stateless client, safe to share)
 _supabase_repo: SupabaseDirectoryRepository | None = None
+_supabase_clusters_repo: SupabaseDirectoryClustersRepository | None = None
 
 
 def get_directory_repo() -> DirectoryRepository:
@@ -119,3 +122,52 @@ def get_servers_derived_repo() -> ServersDerivedRepository:
     if _servers_derived_repo is None:
         _servers_derived_repo = SupabaseServersDerivedRepository()
     return _servers_derived_repo
+
+
+def get_directory_clusters_repo() -> DirectoryClustersRepository:
+    """
+    Directory clusters repository provider.
+    
+    Returns SupabaseDirectoryClustersRepository (uses anon key for public access).
+    Falls back behavior similar to get_directory_repo() if needed.
+    """
+    settings = get_settings()
+    
+    # Try to use Supabase if credentials are configured
+    if settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY:
+        global _supabase_clusters_repo
+        if _supabase_clusters_repo is None:
+            try:
+                _supabase_clusters_repo = SupabaseDirectoryClustersRepository()
+            except RuntimeError as e:
+                # In staging/production, Supabase is required - fail fast
+                if settings.ENV in ("staging", "production"):
+                    raise RuntimeError(
+                        "Directory clusters repository not configured for this environment"
+                    ) from e
+                # In local/dev/test, allow failure but will raise on use
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Supabase clusters repository initialization failed: {e}")
+        
+        # If Supabase repo is configured, use it
+        if _supabase_clusters_repo and _supabase_clusters_repo._configured:
+            return _supabase_clusters_repo
+        # If Supabase repo exists but isn't configured, raise in staging/production
+        elif settings.ENV not in ("local", "development", "test"):
+            raise RuntimeError(
+                f"Directory clusters repository not configured: {_supabase_clusters_repo._config_error if _supabase_clusters_repo else 'not initialized'}"
+            )
+    
+    # No Supabase credentials - fail in staging/production
+    if settings.ENV not in ("local", "development", "test"):
+        raise RuntimeError(
+            "Supabase credentials required in staging/production. "
+            "Set SUPABASE_URL and SUPABASE_ANON_KEY in environment."
+        )
+    
+    # In local/dev/test without Supabase, raise (no mock implementation for clusters yet)
+    raise RuntimeError(
+        "Directory clusters repository requires Supabase. "
+        "Set SUPABASE_URL and SUPABASE_ANON_KEY in environment."
+    )

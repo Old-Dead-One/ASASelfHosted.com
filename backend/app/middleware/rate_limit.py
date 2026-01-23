@@ -57,9 +57,9 @@ class RateLimiter:
         Rate limiting is enabled in production by default.
         In local/dev, it's disabled unless RATE_LIMIT_ENABLED=True.
         """
-        # Enable in production by default, optional in local/dev
+        # Rate limiting must be explicitly enabled (not auto-enabled in production)
         settings = get_settings()
-        enabled = True if settings.ENV == "production" else settings.RATE_LIMIT_ENABLED
+        enabled = settings.RATE_LIMIT_ENABLED
         if not enabled:
             return True
 

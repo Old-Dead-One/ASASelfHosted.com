@@ -69,8 +69,13 @@ class Settings(BaseSettings):
     # Worker configuration
     HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: int = 5  # Poll interval for worker
     HEARTBEAT_JOB_BATCH_SIZE: int = 50  # Batch size for job processing
+    HEARTBEAT_JOB_CLAIM_TTL_SECONDS: int = 120  # reclaim jobs if worker dies mid-claim
     HEARTBEAT_HISTORY_LIMIT: int = 500  # Max heartbeats to fetch per server
     HEARTBEAT_UPTIME_WINDOW_HOURS: int = 24  # Uptime calculation window
+    RUN_HEARTBEAT_WORKER: bool = True
+    
+    # Anomaly detection
+    ANOMALY_DECAY_MINUTES: int = 30  # Clear anomaly flag after T minutes without spikes
 
     def validate_non_local(self) -> None:
         """

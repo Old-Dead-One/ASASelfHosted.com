@@ -85,11 +85,48 @@ Extends Sprint 0 schema with:
 - Computes badge flags (verified, new, stable, pvp/pve, vanilla/boosted)
 - Password visibility handled by RLS (favorited servers can see password)
 
+### `006_sprint_4_agent_auth.sql`
+**Sprint 4 - Agent Authentication & Heartbeat Pipeline**
+
+Adds agent authentication infrastructure:
+- **Clusters table extensions:**
+  - `public_key_ed25519` - Base64 Ed25519 public key for signature verification
+  - `heartbeat_grace_seconds` - Per-cluster grace window override
+- **Heartbeats table extensions:**
+  - `key_version` - Key version for rotation tracking
+  - `heartbeat_id` - UUID for replay protection
+  - `players_current`, `players_capacity` - Canonical player fields (legacy fields kept for compatibility)
+  - `UNIQUE(server_id, heartbeat_id)` constraint for replay protection
+- **Servers table extensions:**
+  - `last_heartbeat_at` - Agent-reported timestamp (distinct from `last_seen_at`)
+- **Heartbeat jobs table:**
+  - Durable queue table for async heartbeat processing
+  - Row-level claiming via `claimed_at` timestamp
+  - One pending job per server (partial unique constraint)
+
+**Key Features:**
+- Ed25519 signature verification (cluster-based, not agent token-based)
+- Replay protection via unique constraint
+- Durable worker queue (table-based, not BackgroundTasks)
+- Grace window: env default + per-cluster override
+
+**To Run:**
+1. Ensure `001_sprint_0_schema.sql` and `003_sprint_3_directory_view.sql` have been applied first
+2. Open Supabase Dashboard → SQL Editor
+3. Copy contents of `006_sprint_4_agent_auth.sql`
+4. Execute in SQL Editor
+5. Verify:
+   - New columns exist in `clusters`, `heartbeats`, `servers` tables
+   - `heartbeat_jobs` table created
+   - Indexes and constraints created
+
 ## Next Steps
 
 After running migrations:
 1. Verify RLS policies are active
 2. Test public read access to `directory_view`
 3. Test owner write access to `servers`
-4. Update Pydantic schemas to match database schema
-5. Create TypeScript types for `DirectoryServer` contract
+4. Test heartbeat endpoint with Ed25519 signature
+5. Verify worker can process heartbeat jobs
+6. Update Pydantic schemas to match database schema
+7. Create TypeScript types for `DirectoryServer` contract

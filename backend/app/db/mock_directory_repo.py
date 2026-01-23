@@ -6,9 +6,11 @@ This allows frontend development without Supabase.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Sequence
+from typing import Any, Literal, Sequence
 
+from app.core.errors import DomainValidationError
 from app.db.directory_repo import DirectoryRepository
+from app.utils.cursor import Cursor, create_cursor, parse_cursor
 from app.schemas.directory import (
     DirectoryServer,
     DirectoryFiltersResponse,
@@ -456,8 +458,8 @@ class MockDirectoryRepository(DirectoryRepository):
 
     async def list_servers(
         self,
-        page: int = 1,
-        page_size: int = 50,
+        limit: int = 25,
+        cursor: str | None = None,
         q: str | None = None,
         status: ServerStatus | None = None,
         mode: VerificationMode | None = None,
@@ -485,12 +487,28 @@ class MockDirectoryRepository(DirectoryRepository):
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
-    ) -> tuple[Sequence[DirectoryServer], int]:
+        now_utc: datetime | None = None,  # Request handling time for seconds_since_seen
+    ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
-        List servers with filtering and pagination.
+        List servers with cursor pagination.
         
         Simple mock implementation - filters and paginates in memory.
         """
+        # Enforce max limit (400 error if > 100)
+        if limit > 100:
+            raise DomainValidationError(f"limit must be <= 100, got {limit}")
+        
+        # Parse and validate cursor
+        parsed_cursor: Cursor | None = None
+        if cursor:
+            parsed_cursor = parse_cursor(cursor)
+            # Validate cursor matches request parameters
+            parsed_cursor.validate_match(rank_by, order)
+        
+        # Get request handling time (consistent across response)
+        if now_utc is None:
+            now_utc = datetime.now(timezone.utc)
+        
         servers = list(MOCK_SERVERS)
 
         # Apply search filter (trim and validate query)
@@ -658,63 +676,105 @@ class MockDirectoryRepository(DirectoryRepository):
                 if any(str(plat).lower() in platforms_set for plat in s.platforms)
             ]
 
-        # Ranking/sorting
-        # Always add a stable tiebreaker (id) so rank is deterministic.
+        # Helper to get sort key value
+        def _get_sort_value(s: DirectoryServer, rank_by: RankBy) -> Any:
+            """Get sort key value for a server."""
+            if rank_by == "updated":
+                return s.updated_at
+            elif rank_by == "new":
+                return s.created_at
+            elif rank_by == "favorites":
+                return s.favorite_count or 0
+            elif rank_by == "players":
+                return s.players_current
+            elif rank_by == "quality":
+                return s.quality_score
+            elif rank_by == "uptime":
+                return s.uptime_percent
+            else:
+                return s.updated_at
+
+        # Ranking/sorting with tie-break (id always ASC)
         reverse = order == "desc"
+        
+        # Sort by sort key, then id (tie-break)
+        servers.sort(key=lambda s: (_get_sort_value(s, rank_by), s.id), reverse=reverse)
+        
+        # Apply cursor seek predicate
+        if parsed_cursor:
+            cursor_last_value = parsed_cursor.last_value
+            cursor_last_id = parsed_cursor.last_id
+            
+            filtered_servers = []
+            for s in servers:
+                sort_value = _get_sort_value(s, rank_by)
+                
+                # Skip items that match cursor exactly but should be excluded
+                if sort_value == cursor_last_value:
+                    if order == "desc":
+                        # For DESC: exclude if id >= last_id
+                        if s.id >= cursor_last_id:
+                            continue
+                    else:
+                        # For ASC: exclude if id <= last_id
+                        if s.id <= cursor_last_id:
+                            continue
+                
+                # For DESC: include if sort_value < last_value OR (sort_value = last_value AND id < last_id)
+                # For ASC: include if sort_value > last_value OR (sort_value = last_value AND id > last_id)
+                if order == "desc":
+                    if sort_value is None or cursor_last_value is None:
+                        # NULL handling: if last_value is NULL, skip NULLs (we're past them)
+                        if cursor_last_value is None and sort_value is not None:
+                            filtered_servers.append(s)
+                        elif sort_value is None:
+                            continue  # Skip NULLs
+                    elif sort_value < cursor_last_value or (sort_value == cursor_last_value and s.id < cursor_last_id):
+                        filtered_servers.append(s)
+                else:
+                    if sort_value is None or cursor_last_value is None:
+                        # NULL handling: if last_value is NULL, skip NULLs (they come after)
+                        if cursor_last_value is None and sort_value is not None:
+                            filtered_servers.append(s)
+                        elif sort_value is None:
+                            continue  # Skip NULLs
+                    elif sort_value > cursor_last_value or (sort_value == cursor_last_value and s.id > cursor_last_id):
+                        filtered_servers.append(s)
+            
+            servers = filtered_servers
 
-        def _safe_num(v, default=0):
-            return v if isinstance(v, (int, float)) else default
+        # Take limit + 1 to detect if there's a next page
+        has_next = len(servers) > limit
+        paginated_servers = servers[:limit + 1] if has_next else servers
 
-        if rank_by == "updated":
-            servers.sort(key=lambda s: (s.updated_at, s.created_at, s.id), reverse=reverse)
-        elif rank_by == "new":
-            # Sort by created_at DESC (newest listings first)
-            servers.sort(key=lambda s: (s.created_at, s.id), reverse=reverse)
-        elif rank_by == "favorites":
-            # Fallback to updated if favorites not available
-            servers.sort(key=lambda s: (_safe_num(s.favorite_count), s.updated_at, s.id), reverse=reverse)
-        elif rank_by == "players":
-            # Fallback to updated if players not available
-            servers.sort(key=lambda s: (_safe_num(s.players_current), s.updated_at, s.id), reverse=reverse)
-        elif rank_by == "quality":
-            # Fallback to updated if quality not available
-            servers.sort(key=lambda s: (_safe_num(s.quality_score), s.updated_at, s.id), reverse=reverse)
-        elif rank_by == "uptime":
-            # Sort by uptime_percent (canonical, 0-100 scale)
-            # Fallback to updated if uptime not available
-            servers.sort(key=lambda s: (_safe_num(s.uptime_percent), s.updated_at, s.id), reverse=reverse)
-        else:
-            # Future-proof fallback
-            servers.sort(key=lambda s: (s.updated_at, s.created_at, s.id), reverse=True)
-
-        # Calculate pagination
-        total = len(servers)
-        start = (page - 1) * page_size
-        end = start + page_size
-        paginated_servers = servers[start:end]
-
-        # Assign rank + rank_by on returned objects only (don't mutate global list)
-        # Global rank within sorted/filtered dataset:
-        #   rank = absolute index + 1
+        # Convert to DirectoryServer with seconds_since_seen
         results: list[DirectoryServer] = []
-        for idx, s in enumerate(paginated_servers, start=start):
-            rank_pos = idx + 1
-            # Use canonical uptime_percent if present, otherwise derive from uptime_24h
-            # Don't overwrite if it already exists
+        last_server = None
+        for s in paginated_servers:
+            # Compute seconds_since_seen
+            seconds_since_seen = None
+            if s.last_seen_at:
+                # Ensure timezone-aware
+                last_seen_dt = s.last_seen_at
+                if last_seen_dt.tzinfo is None:
+                    last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                
+                # Compute seconds_since_seen = now_utc - last_seen_at
+                delta = (now_utc - last_seen_dt).total_seconds()
+                seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
+            
+            # Use canonical uptime_percent if present
             uptime_percent = (
                 s.uptime_percent
                 if s.uptime_percent is not None
                 else (s.uptime_24h * 100.0 if s.uptime_24h is not None else None)
             )
             
-            # Pydantic BaseModel copy depends on your BaseSchema config.
-            # If BaseSchema is Pydantic v2, use model_copy(update=...).
-            # If v1, use copy(update=...).
+            # Pydantic BaseModel copy
             try:
                 s2 = s.model_copy(
                     update={
-                        "rank": rank_pos,  # Legacy alias
-                        "rank_position": rank_pos,  # Canonical field
+                        "seconds_since_seen": seconds_since_seen,
                         "rank_by": rank_by,
                         "uptime_percent": uptime_percent,
                     }
@@ -722,15 +782,21 @@ class MockDirectoryRepository(DirectoryRepository):
             except AttributeError:
                 s2 = s.copy(
                     update={
-                        "rank": rank_pos,
-                        "rank_position": rank_pos,
+                        "seconds_since_seen": seconds_since_seen,
                         "rank_by": rank_by,
                         "uptime_percent": uptime_percent,
                     }
                 )
             results.append(s2)
+            last_server = s
 
-        return results, total
+        # Generate next_cursor if there are more results
+        next_cursor = None
+        if has_next and last_server:
+            last_sort_value = _get_sort_value(last_server, rank_by)
+            next_cursor = create_cursor(rank_by, order, last_sort_value, last_server.id)
+
+        return results, next_cursor
 
     async def get_filters(self) -> DirectoryFiltersResponse:
         """
@@ -848,4 +914,25 @@ class MockDirectoryRepository(DirectoryRepository):
 
     async def get_server(self, server_id: str) -> DirectoryServer | None:
         """Get server by ID."""
-        return next((s for s in MOCK_SERVERS if s.id == server_id), None)
+        server = next((s for s in MOCK_SERVERS if s.id == server_id), None)
+        if server is None:
+            return None
+        
+        # Compute seconds_since_seen (request handling time)
+        now_utc = datetime.now(timezone.utc)
+        seconds_since_seen = None
+        if server.last_seen_at:
+            # Ensure timezone-aware
+            last_seen_dt = server.last_seen_at
+            if last_seen_dt.tzinfo is None:
+                last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+            
+            # Compute seconds_since_seen = now_utc - last_seen_at
+            delta = (now_utc - last_seen_dt).total_seconds()
+            seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
+        
+        # Return server with seconds_since_seen
+        try:
+            return server.model_copy(update={"seconds_since_seen": seconds_since_seen})
+        except AttributeError:
+            return server.copy(update={"seconds_since_seen": seconds_since_seen})

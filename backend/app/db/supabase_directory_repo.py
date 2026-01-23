@@ -5,10 +5,11 @@ Read-only repository that queries from directory_view in Supabase.
 Fails fast if Supabase is not configured in non-local environments.
 """
 
+from datetime import datetime, timezone
 from typing import Sequence
 
 from app.core.config import get_settings
-from app.core.errors import NotImplementedError
+from app.core.errors import DomainValidationError, NotImplementedError
 from app.db.directory_repo import DirectoryRepository
 from app.schemas.directory import (
     DirectoryServer,
@@ -27,6 +28,7 @@ from app.schemas.directory import (
     ClusterInfo,
     NumericRange,
 )
+from app.utils.cursor import Cursor, create_cursor, parse_cursor
 
 
 class SupabaseDirectoryRepository(DirectoryRepository):
@@ -68,6 +70,46 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         # Fallback: try to convert to list
         return list(value) if value else []
 
+    @staticmethod
+    def _map_rank_by_to_column(rank_by: RankBy) -> str:
+        """
+        Map rank_by parameter to database column name.
+        
+        Args:
+            rank_by: Sort key parameter
+            
+        Returns:
+            Database column name for sorting
+        """
+        mapping = {
+            "updated": "updated_at",
+            "new": "created_at",
+            "favorites": "favorite_count",
+            "players": "players_current",
+            "quality": "quality_score",
+            "uptime": "uptime_percent",
+        }
+        return mapping.get(rank_by, "updated_at")  # Default to updated_at
+
+    @staticmethod
+    def _is_nullable_column(column: str) -> bool:
+        """
+        Check if a column can be NULL.
+        
+        Args:
+            column: Database column name
+            
+        Returns:
+            True if column can be NULL, False otherwise
+        """
+        nullable_columns = {
+            "players_current",
+            "quality_score",
+            "uptime_percent",
+            "favorite_count",  # Can be 0 but not NULL in practice, but check anyway
+        }
+        return column in nullable_columns
+
     def __init__(self):
         settings = get_settings()
         
@@ -103,8 +145,8 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
     async def list_servers(
         self,
-        page: int = 1,
-        page_size: int = 50,
+        limit: int = 25,
+        cursor: str | None = None,
         q: str | None = None,
         status: ServerStatus | None = None,
         mode: VerificationMode | None = None,
@@ -132,9 +174,13 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
-    ) -> tuple[Sequence[DirectoryServer], int]:
+        now_utc: datetime | None = None,  # Request handling time for seconds_since_seen
+    ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
-        List servers from Supabase directory_view with filtering, pagination, and ranking.
+        List servers from Supabase directory_view with cursor pagination.
+        
+        Returns:
+            Tuple of (server list, next_cursor). next_cursor is None if no more results.
         """
         if not self._configured:
             error_msg = "SupabaseDirectoryRepository not configured"
@@ -144,6 +190,25 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         if self._supabase is None:
             raise RuntimeError("Supabase client not initialized")
+
+        # Enforce max limit (400 error if > 100)
+        if limit > 100:
+            raise DomainValidationError(f"limit must be <= 100, got {limit}")
+
+        # Parse and validate cursor
+        parsed_cursor: Cursor | None = None
+        if cursor:
+            parsed_cursor = parse_cursor(cursor)
+            # Validate cursor matches request parameters
+            parsed_cursor.validate_match(rank_by, order)
+
+        # Get request handling time (consistent across response)
+        if now_utc is None:
+            now_utc = datetime.now(timezone.utc)
+
+        # Map rank_by to database column
+        sort_column = self._map_rank_by_to_column(rank_by)
+        is_nullable = self._is_nullable_column(sort_column)
 
         # Build query from directory_view
         # Explicitly select columns matching DirectoryServer schema (minus rank fields computed in backend)
@@ -156,7 +221,8 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             "platforms,is_official_plus,is_modded,is_crossplay,is_console,is_pc,"
             "players_current,players_capacity,quality_score,uptime_percent"
         )
-        query = self._supabase.table("directory_view").select(select_columns, count="exact")
+        # No count needed for cursor pagination
+        query = self._supabase.table("directory_view").select(select_columns)
 
         # Apply search filter (q parameter)
         # Search in name, description, map_name, cluster_name using OR
@@ -291,58 +357,136 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # This gives us OR semantics - server matches if its platforms overlap with any requested platform
                 query = query.overlaps("platforms", platforms_clean)
 
-        # SQL ordering (Sprint 3 rule - always ORDER BY updated_at with id tiebreaker)
-        # Always use updated_at regardless of requested rank_by (others fallback to updated)
-        # Note: id tiebreaker is always ASC regardless of main sort direction
-        # NULLS LAST is handled by PostgREST default behavior for DESC, but we document it for clarity
+        # Apply cursor seek predicate if cursor provided
+        # PostgREST OR syntax limitations: complex AND inside OR is not directly supported
+        # Strategy: Fetch items where sort_key <= last_value (DESC) or >= last_value (ASC)
+        # Then filter exact matches in Python based on id comparison
+        cursor_last_value = None
+        cursor_last_id = None
+        if parsed_cursor:
+            cursor_last_value = parsed_cursor.last_value
+            cursor_last_id = parsed_cursor.last_id
+            
+            if cursor_last_value is None:
+                # NULL handling: if last_value is NULL, we're past all NULLs
+                # For both ASC and DESC with NULLS LAST, we want non-NULL values only
+                query = query.not_.is_(sort_column, "null")
+            else:
+                # For DESC: fetch sort_key <= last_value (exact matches filtered in Python)
+                # For ASC: fetch sort_key >= last_value (exact matches filtered in Python)
+                if order == "desc":
+                    query = query.lte(sort_column, cursor_last_value)
+                else:
+                    query = query.gte(sort_column, cursor_last_value)
+
+        # SQL ordering with tie-break
+        # ORDER BY sort_column, id (id always ASC for tie-break)
+        # NULLS LAST for nullable columns (PostgREST default for DESC, explicit for ASC)
+        # Note: PostgREST Python client may not support nullsfirst parameter directly
+        # We rely on PostgREST default: NULLS LAST for DESC, NULLS FIRST for ASC
+        # For nullable columns with ASC, we may need to handle NULLs explicitly if needed
         if order == "asc":
-            # ASC: updated_at ASC NULLS LAST, id ASC
-            query = query.order("updated_at", desc=False).order("id", desc=False)
+            query = query.order(sort_column, desc=False).order("id", desc=False)
         else:
-            # DESC: updated_at DESC NULLS LAST, id ASC
-            query = query.order("updated_at", desc=True).order("id", desc=False)
+            query = query.order(sort_column, desc=True).order("id", desc=False)
 
-        # Handle pagination (LIMIT/OFFSET)
-        offset = (page - 1) * page_size
-        query = query.range(offset, offset + page_size - 1)
+        # Cursor pagination: fetch limit + 1 to detect if there's a next page
+        query = query.limit(limit + 1)
 
-        # Execute query
+        # Execute query (no count needed for cursor pagination)
         try:
             response = query.execute()
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "Directory read error: failed to query directory_view",
+                extra={
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "read_operation": "list_servers",
+                    "rank_by": rank_by,
+                    "order": order,
+                    "limit": limit,
+                },
+                exc_info=True
+            )
             raise RuntimeError(f"Failed to query directory_view: {str(e)}") from e
 
-        # Extract data and count
+        # Extract data
         data = response.data if hasattr(response, "data") else []
-        # Handle count properly - if None, we can't provide accurate total
-        total = getattr(response, "count", None)
-        if total is None:
-            # If count="exact" didn't return a count, we can't provide accurate total
-            # DirectoryResponse.total requires int >= 0, so return 0 to indicate "unknown"
-            # This is a fallback - count="exact" should normally work
-            total = 0  # Indicates count unavailable (unknown total)
-
+        
+        # Filter out cursor boundary items (exact matches that should be excluded)
+        if parsed_cursor and cursor_last_value is not None and cursor_last_id:
+            filtered_data = []
+            for row in data:
+                sort_value = row.get(sort_column)
+                row_id = row.get("id")
+                
+                # Skip items that match cursor exactly but should be excluded
+                if sort_value == cursor_last_value:
+                    if order == "desc":
+                        # For DESC: exclude if id >= last_id
+                        if row_id >= cursor_last_id:
+                            continue
+                    else:
+                        # For ASC: exclude if id <= last_id
+                        if row_id <= cursor_last_id:
+                            continue
+                
+                filtered_data.append(row)
+            data = filtered_data
+        
+        # Check if there's a next page (we fetched limit + 1)
+        has_next = len(data) > limit
+        if has_next:
+            data = data[:limit]  # Keep only limit items
+        
         # Convert to DirectoryServer objects
+        # Note: Ranking module is created but not yet integrated into sorting
+        # Current implementation sorts by sort_column directly (quality_score, uptime_percent, etc.)
+        # Ranking module will be used when we add composite ranking or "ranking" as a rank_by option
         servers: list[DirectoryServer] = []
-        for idx, row in enumerate(data):
+        last_row = None
+        for row in data:
             try:
-                # Compute rank_position in Python (global rank within sorted/filtered dataset)
-                # Formula: (page - 1) * page_size + idx + 1
-                rank_position = (page - 1) * page_size + idx + 1
-
                 # Normalize array fields (handle Postgres array string format if needed)
                 # DirectoryServer requires list, not Optional or string
                 row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
                 row["platforms"] = self._normalize_array_field(row.get("platforms"))
-
-                # Create DirectoryServer with rank fields
+                
+                # Compute seconds_since_seen
+                last_seen_at = row.get("last_seen_at")
+                seconds_since_seen = None
+                if last_seen_at:
+                    # Parse last_seen_at if it's a string
+                    if isinstance(last_seen_at, str):
+                        from datetime import datetime
+                        last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+                    else:
+                        last_seen_dt = last_seen_at
+                    
+                    # Ensure timezone-aware
+                    if last_seen_dt.tzinfo is None:
+                        last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                    
+                    # Compute seconds_since_seen = now_utc - last_seen_at
+                    delta = (now_utc - last_seen_dt).total_seconds()
+                    seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
+                
+                # Get sort key value for cursor generation
+                sort_value = row.get(sort_column)
+                
+                # Create DirectoryServer with rank fields and seconds_since_seen
                 server = DirectoryServer(
                     **row,
-                    rank_position=rank_position,
+                    seconds_since_seen=seconds_since_seen,
+                    rank_position=None,  # Not needed for cursor pagination
                     rank_by=rank_by,
-                    rank_delta_24h=None,  # Placeholder for Sprint 4
+                    rank_delta_24h=None,  # Placeholder for Sprint 5
                 )
                 servers.append(server)
+                last_row = row  # Keep track of last row for cursor generation
             except Exception as e:
                 # Handle parse errors based on environment
                 import logging
@@ -363,7 +507,17 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     logger.error(error_msg)
                     raise RuntimeError(f"Failed to parse server row from directory_view: {e}") from e
 
-        return servers, total
+        # Generate next_cursor if there are more results
+        next_cursor = None
+        if has_next and last_row:
+            # Get sort value and id from last row
+            last_sort_value = last_row.get(sort_column)
+            last_id = last_row.get("id")
+            
+            if last_id:
+                next_cursor = create_cursor(rank_by, order, last_sort_value, last_id)
+
+        return servers, next_cursor
 
     async def get_server(self, server_id: str) -> DirectoryServer | None:
         """
@@ -407,15 +561,48 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             # DirectoryServer requires list, not Optional or string
             row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
             row["platforms"] = self._normalize_array_field(row.get("platforms"))
+            
+            # Compute seconds_since_seen (request handling time)
+            now_utc = datetime.now(timezone.utc)
+            last_seen_at = row.get("last_seen_at")
+            seconds_since_seen = None
+            if last_seen_at:
+                # Parse last_seen_at if it's a string
+                if isinstance(last_seen_at, str):
+                    last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+                else:
+                    last_seen_dt = last_seen_at
+                
+                # Ensure timezone-aware
+                if last_seen_dt.tzinfo is None:
+                    last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                
+                # Compute seconds_since_seen = now_utc - last_seen_at
+                delta = (now_utc - last_seen_dt).total_seconds()
+                seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
+            
             # Set rank fields for consistency (rank_position=None for single fetch is fine)
             server = DirectoryServer(
                 **row,
+                seconds_since_seen=seconds_since_seen,
                 rank_by="updated",  # Consistent with list_servers behavior
-                rank_delta_24h=None,  # Placeholder for Sprint 4
+                rank_delta_24h=None,  # Placeholder for Sprint 5
             )
             return server
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "Directory read error: failed to query directory_view for server",
+                extra={
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "read_operation": "get_server",
+                    "server_id": server_id,
+                },
+                exc_info=True
+            )
             raise RuntimeError(f"Failed to query directory_view for server {server_id}: {str(e)}") from e
 
     async def get_filters(self) -> DirectoryFiltersResponse:
@@ -519,6 +706,17 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             )
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "Directory read error: failed to query filter metadata",
+                extra={
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "read_operation": "get_filters",
+                },
+                exc_info=True
+            )
             raise RuntimeError(f"Failed to query filter metadata: {str(e)}") from e
 
     async def get_facets(self) -> dict[str, list[str]]:
@@ -591,4 +789,15 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             }
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "Directory read error: failed to query facets",
+                extra={
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "read_operation": "get_facets",
+                },
+                exc_info=True
+            )
             raise RuntimeError(f"Failed to query facets: {str(e)}") from e

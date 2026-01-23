@@ -2,6 +2,14 @@
 Status engine.
 
 Computes effective_status from heartbeat history and grace window.
+Uses received_at (server-trusted clock) for liveness calculation.
+
+Invariants:
+- Output is always one of: "online", "offline", "unknown" (never None)
+- Stability: Same inputs → same output (deterministic, no randomness)
+- Based on received_at (not agent-reported timestamp) for server-trusted clock
+- Unknown behavior: Returns "unknown" if no heartbeats (insufficient data)
+- Tie-break: Most recent heartbeat wins (deterministic ordering by received_at DESC)
 """
 
 from datetime import datetime, timezone
@@ -19,15 +27,21 @@ def compute_effective_status(
     Compute effective_status from heartbeat history.
     
     Rules:
-    - No heartbeats → unknown (does NOT override manual status if set)
-    - Latest received_at within grace window → online
-    - Otherwise → offline
+    - No heartbeats → "unknown" (does NOT override manual status if set)
+    - Latest received_at within grace window → "online"
+    - Otherwise → "offline"
     
     Uses received_at (server-trusted clock) for liveness.
     
-    Note: If no agent heartbeats exist, this returns "unknown" but does not
-    override a manually-set effective_status. The worker should only update
-    effective_status if agent heartbeats exist (status_source='agent').
+    Unknown Behavior:
+    - Returns "unknown" if no heartbeats (insufficient data)
+    - Note: This does not override manual status - worker should only update
+      effective_status when status_source='agent' (i.e., when heartbeats exist)
+    
+    Stability:
+    - Deterministic: Same heartbeats + same grace_window → same output
+    - Based on received_at (server-trusted clock), not agent timestamp
+    - Tie-break: Most recent heartbeat (deterministic ordering)
     
     Args:
         server_id: Server UUID (for logging/debugging)
@@ -36,6 +50,13 @@ def compute_effective_status(
         
     Returns:
         Tuple of (effective_status, last_seen_at datetime or None)
+        - effective_status: "online", "offline", or "unknown"
+        - last_seen_at: Most recent received_at, or None if no heartbeats
+        
+    Examples:
+        - No heartbeats → ("unknown", None)
+        - Latest heartbeat 5 minutes ago, grace=600s → ("online", latest_received_at)
+        - Latest heartbeat 15 minutes ago, grace=600s → ("offline", latest_received_at)
     """
     if not heartbeats:
         # Never seen by agent → unknown

@@ -6,6 +6,7 @@ This is the seam where mock data (Sprint 1) plugs into real Supabase (Sprint 2+)
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Sequence
 
 from app.schemas.directory import (
@@ -37,8 +38,8 @@ class DirectoryRepository(ABC):
     @abstractmethod
     async def list_servers(
         self,
-        page: int = 1,
-        page_size: int = 50,
+        limit: int = 25,
+        cursor: str | None = None,
         q: str | None = None,
         status: ServerStatus | None = None,
         mode: VerificationMode | None = None,
@@ -71,13 +72,14 @@ class DirectoryRepository(ABC):
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
-    ) -> tuple[Sequence[DirectoryServer], int]:
+        now_utc: datetime | None = None,  # Request handling time for seconds_since_seen computation
+    ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
-        List servers from directory view.
+        List servers from directory view with cursor pagination.
         
         Args:
-            page: Page number (1-indexed)
-            page_size: Items per page
+            limit: Maximum number of items to return (default 25, max 100)
+            cursor: Opaque cursor string for pagination (from previous response)
             q: Optional search query (server name, description, map name, cluster name)
             status: Optional status filter (online, offline, unknown)
             mode: Optional verification mode filter (manual, verified)
@@ -106,9 +108,10 @@ class DirectoryRepository(ABC):
             pc: Tri-state filter for PC support (any/true/false)
             mods: Multi-select filter for mod names (OR semantics)
             platforms: Multi-select filter for platforms (OR semantics)
+            now_utc: Request handling time for seconds_since_seen computation (must be consistent across response)
             
         Returns:
-            Tuple of (server list, total count)
+            Tuple of (server list, next_cursor). next_cursor is None if no more results.
         """
         ...
 

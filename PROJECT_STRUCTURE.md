@@ -2,7 +2,7 @@
 
 Complete file and folder structure for ASASelfHosted.com development.
 
-**Last Updated:** After Sprint 2 completion
+**Last Updated:** After Sprint 4 cleanup and Sprint 5 planning
 
 ## Root Level Files
 
@@ -15,6 +15,7 @@ asaselfhosted.com/
 ├── 3_TECH_STACK.txt      # Technology stack
 ├── 4_Dev_Plan.txt        # Development plan
 ├── DECISIONS.md          # Official decisions (override design docs)
+├── DESIGN_DOC_COMPARISON.md  # Design document comparison
 ├── DEV_NOTES.md          # Development notes and context
 ├── GIT_SETUP.md          # Git setup and workflow
 ├── INSTALL.md            # Installation instructions
@@ -23,6 +24,11 @@ asaselfhosted.com/
 ├── SPRINT_1_COMPLETION_CHECKLIST.md  # Sprint 1 completion tracking
 ├── SPRINT_ONE_PLAYBOOK.txt           # Sprint 1 playbook
 ├── SPRINT_TWO_PLAYBOOK.md            # Sprint 2 playbook
+├── SPRINT_THREE_PLAYBOOK.txt         # Sprint 3 playbook
+├── SPRINT_FOUR_PLAYBOOK.txt          # Sprint 4 playbook
+├── SPRINT_FIVE_PLAYBOOK.txt          # Sprint 5 playbook
+├── SPRINT_5_IMPLEMENTATION_PLAN.md   # Sprint 5 implementation plan
+├── SUPABASE_SETUP.md     # Supabase setup guide
 └── VERIFICATION.md       # Setup verification checklist
 ```
 
@@ -39,15 +45,17 @@ backend/
 │   │       ├── servers.py      # Server CRUD endpoints
 │   │       ├── clusters.py     # Cluster endpoints
 │   │       ├── verification.py # Verification endpoints
-│   │       ├── heartbeat.py    # Heartbeat ingestion
+│   │       ├── heartbeat.py    # Agent heartbeat ingestion (Sprint 4: Ed25519 auth)
 │   │       ├── consent.py      # Consent management
 │   │       ├── subscriptions.py # Subscription management
 │   │       └── webhooks.py     # Stripe webhooks
 │   ├── core/                   # Core configuration
 │   │   ├── __init__.py
 │   │   ├── config.py          # Settings (env vars, get_settings pattern)
+│   │   ├── crypto.py          # Ed25519 signature verification (Sprint 4)
 │   │   ├── deps.py            # FastAPI dependencies (auth, user identity)
 │   │   ├── errors.py          # Error handling (centralized API errors)
+│   │   ├── heartbeat.py       # Heartbeat utilities (grace window, etc.) (Sprint 4)
 │   │   ├── security.py        # JWT verification, JWKS, user identity
 │   │   └── supabase.py        # Supabase client
 │   ├── middleware/            # Request middleware
@@ -63,28 +71,54 @@ backend/
 │   │   ├── servers.py       # Server schemas
 │   │   ├── clusters.py      # Cluster schemas
 │   │   ├── verification.py  # Verification schemas
-│   │   ├── heartbeat.py     # Heartbeat schemas
+│   │   ├── heartbeat.py     # Heartbeat request/response schemas (Sprint 4: Ed25519)
 │   │   ├── consent.py       # Consent schemas
 │   │   └── subscriptions.py # Subscription schemas
 │   ├── models/              # Domain models (reference only)
 │   │   ├── __init__.py
 │   │   └── domain.py       # Domain type definitions
+│   ├── engines/            # Derived state computation engines (Sprint 4)
+│   │   ├── __init__.py
+│   │   ├── status_engine.py      # Effective status computation
+│   │   ├── confidence_engine.py   # RYG confidence computation
+│   │   ├── uptime_engine.py      # Uptime percentage computation
+│   │   └── quality_engine.py     # Quality score computation
 │   ├── utils/              # Utility functions
 │   │   ├── __init__.py
-│   │   ├── crypto.py      # Cryptographic utilities
+│   │   ├── crypto.py      # Legacy crypto utilities (deprecated, use core/crypto.py)
 │   │   └── stripe.py       # Stripe utilities
+│   ├── workers/            # Background workers (Sprint 4)
+│   │   ├── __init__.py
+│   │   └── heartbeat_worker.py  # Durable worker for heartbeat processing
 │   ├── db/                 # Database layer (Sprint 1+)
 │   │   ├── __init__.py
 │   │   ├── directory_repo.py      # Directory repository interface
+│   │   ├── heartbeat_repo.py      # Heartbeat repository interface (Sprint 4)
+│   │   ├── heartbeat_jobs_repo.py # Heartbeat jobs queue interface (Sprint 4)
+│   │   ├── servers_derived_repo.py # Servers derived state repository (Sprint 4)
 │   │   ├── mock_directory_repo.py # Mock implementation (Sprint 1)
-│   │   ├── supabase_directory_repo.py # Supabase implementation (Sprint 2+)
+│   │   ├── supabase_directory_repo.py # Supabase implementation (Sprint 3+)
+│   │   ├── supabase_heartbeat_repo.py # Heartbeat persistence (Sprint 4)
+│   │   ├── supabase_heartbeat_jobs_repo.py # Durable queue (Sprint 4)
+│   │   ├── supabase_servers_derived_repo.py # Derived state updates (Sprint 4)
 │   │   ├── providers.py           # Repository provider (DI)
 │   │   ├── queries.py            # Database query helpers
-│   │   └── migrations/            # Migration references
+│   │   └── migrations/            # SQL migration files
+│   │       ├── 001_sprint_0_schema.sql
+│   │       ├── 003_sprint_3_directory_view.sql
+│   │       ├── 004_sample_servers.sql
+│   │       ├── 005_validate_platforms_type.sql
+│   │       └── 006_sprint_4_agent_auth.sql
 │   └── main.py            # FastAPI app entry point
 ├── tests/                 # Test suite (Sprint 1+)
 │   ├── __init__.py
-│   └── test_auth_contract.py  # Auth contract smoke tests
+│   ├── test_auth_contract.py  # Auth contract smoke tests
+│   ├── test_crypto.py         # Ed25519 crypto tests (Sprint 4)
+│   ├── test_heartbeat_endpoint.py  # Heartbeat endpoint tests (Sprint 4)
+│   ├── test_status_engine.py  # Status engine tests (Sprint 4)
+│   ├── test_confidence_engine.py  # Confidence engine tests (Sprint 4)
+│   ├── test_uptime_engine.py   # Uptime engine tests (Sprint 4)
+│   └── test_quality_engine.py  # Quality engine tests (Sprint 4)
 ├── requirements.txt
 ├── pyproject.toml
 ├── .env.example
@@ -168,15 +202,38 @@ frontend/
 - **UI components**: shadcn/ui for accessible primitives
 - **Dev auth**: Local bypass utilities for development
 
-## Sprint 1 & 2 Additions
+## Sprint Additions
 
-### New Backend Components (Sprint 1+)
+### Sprint 1 & 2 Additions
 - **Directory API** (`api/v1/directory.py`): Public read-only directory endpoints
 - **Repository Layer** (`db/directory_repo.py`, `mock_directory_repo.py`, `supabase_directory_repo.py`): Abstract data access
 - **Request ID Middleware** (`middleware/request_id.py`): Request correlation
 - **Directory Schemas** (`schemas/directory.py`): Complete directory contract with filters, ranking, facets
 - **Auth Dependencies** (`core/deps.py`): `get_optional_user()`, `require_user()`
 - **JWKS Security** (`core/security.py`): Real JWT verification with JWKS
+
+### Sprint 3 Additions
+- **Supabase Directory Repository** (`db/supabase_directory_repo.py`): Full implementation with filtering, ranking, facets
+- **Directory View** (`migrations/003_sprint_3_directory_view.sql`): Denormalized read model
+- **Indexing Strategy**: Performance indexes for filtering and ranking
+
+### Sprint 4 Additions (Agent Pipeline)
+- **Crypto Module** (`core/crypto.py`): Ed25519 signature verification, canonical envelope serialization
+- **Heartbeat Utilities** (`core/heartbeat.py`): Grace window resolution
+- **Heartbeat Endpoint** (`api/v1/heartbeat.py`): Secure agent heartbeat ingestion with signature verification
+- **Heartbeat Repositories**:
+  - `db/heartbeat_repo.py` + `supabase_heartbeat_repo.py`: Append-only heartbeat persistence
+  - `db/heartbeat_jobs_repo.py` + `supabase_heartbeat_jobs_repo.py`: Durable queue for async processing
+  - `db/servers_derived_repo.py` + `supabase_servers_derived_repo.py`: Derived state updates
+- **Engines** (`engines/`): Python-based computation engines
+  - `status_engine.py`: Effective status (online/offline/unknown)
+  - `confidence_engine.py`: RYG confidence (green/yellow/red)
+  - `uptime_engine.py`: 24h rolling window uptime percentage
+  - `quality_engine.py`: Quality score (0-100)
+- **Worker** (`workers/heartbeat_worker.py`): Durable background worker for heartbeat processing
+- **Database Migration** (`migrations/006_sprint_4_agent_auth.sql`): Agent auth fields, heartbeat_jobs table, indexes
+- **Error Types** (`core/errors.py`): SignatureVerificationError, KeyVersionMismatchError, HeartbeatReplayError
+- **Test Suite**: Comprehensive tests for crypto, engines, and endpoint
 
 ### New Frontend Components (Sprint 1+)
 - **Directory Types** (`types/index.ts`): Complete TypeScript types matching backend
@@ -212,7 +269,38 @@ frontend/
 - Type safety improvements
 - Contract alignment frontend/backend
 
-**Ready for Sprint 3:**
-- Supabase SQL implementation
+**Sprint 3 Complete:**
+- Supabase SQL implementation (`directory_view`)
 - Real filtering and ranking
 - Indexes and performance optimization
+- `SupabaseDirectoryRepository` fully implemented
+- Sample data and validation scripts
+
+**Sprint 4 Complete:**
+- Agent heartbeat pipeline with Ed25519 signature verification
+- Durable worker for async heartbeat processing
+- Derived state engines (status, confidence, uptime, quality)
+- Replay protection via `UNIQUE(server_id, heartbeat_id)`
+- Row-level job claiming for multi-worker safety
+- Production hardening (crypto whitelist, timestamp normalization, etc.)
+- FastAPI lifespan handler (replaces deprecated on_event)
+- CI workflow with test environment setup
+- Comprehensive test suite (26 tests passing)
+
+**Sprint 4 Cleanup Complete:**
+- Security: Removed .env from git tracking, updated .gitignore
+- Durable queue: Fixed stuck claims (clear claimed_at on success/failure)
+- Stale claim reclaim: Added TTL-based reclaim for crashed workers
+- Rate limiting: Removed auto-enable in production
+- Worker startup: Prevented worker startup during tests
+- Heartbeat endpoint: Refactored to use repositories only (fully testable)
+- Tests: Replaced stub tests with real hermetic tests
+- CI: Updated for test environment gating
+
+**Ready for Sprint 5:**
+- Directory read APIs hardening
+- Ranking & scoring predictability
+- Anti-gaming guards
+- Snapshot consistency
+- Observability improvements
+- Comprehensive test expansion

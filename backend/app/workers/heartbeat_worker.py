@@ -16,6 +16,7 @@ from app.db.providers import (
     get_servers_derived_repo,
 )
 from app.db.servers_derived_repo import ServersDerivedRepository
+from app.engines.anomaly_engine import detect_player_spike_anomaly
 from app.engines.confidence_engine import compute_confidence
 from app.engines.quality_engine import compute_quality_score
 from app.engines.status_engine import compute_effective_status
@@ -70,8 +71,13 @@ async def process_heartbeat_jobs(
                             job["attempts"]
                         )
                         logger.warning(
-                            f"Job failed: server/cluster not found",
-                            extra={"job_id": job["id"], "server_id": job["server_id"]}
+                            "Job failed: server/cluster not found",
+                            extra={
+                                "job_id": job["id"],
+                                "server_id": job["server_id"],
+                                "failure_reason": "server_cluster_not_found",
+                                "attempts": job["attempts"],
+                            }
                         )
                         continue
                     
@@ -92,6 +98,9 @@ async def process_heartbeat_jobs(
                             extra={"job_id": job["id"], "server_id": job["server_id"]}
                         )
                         continue
+                    
+                    # Get current anomaly state (for decay logic)
+                    current_anomaly_flag, last_anomaly_at = await derived_repo.get_current_anomaly_state(job["server_id"])
                     
                     # Get grace window
                     grace_window = get_grace_window_seconds(cluster_info["heartbeat_grace_seconds"])
@@ -133,6 +142,15 @@ async def process_heartbeat_jobs(
                         heartbeats
                     )
                     
+                    # Run anomaly detection engine
+                    anomaly_flag, anomaly_last_detected_at = detect_player_spike_anomaly(
+                        job["server_id"],
+                        heartbeats,
+                        current_anomaly_flag,
+                        last_anomaly_at,
+                        anomaly_decay_minutes=settings.ANOMALY_DECAY_MINUTES
+                    )
+                    
                     # Log status transition (if changed)
                     logger.debug(
                         f"Engine outputs",
@@ -141,7 +159,8 @@ async def process_heartbeat_jobs(
                             "status": status,
                             "confidence": confidence,
                             "uptime_percent": uptime,
-                            "quality_score": quality
+                            "quality_score": quality,
+                            "anomaly_players_spike": anomaly_flag
                         }
                     )
                     
@@ -157,7 +176,9 @@ async def process_heartbeat_jobs(
                             quality_score=quality,
                             players_current=latest_players_current,
                             players_capacity=latest_players_capacity,
-                            last_heartbeat_at=last_seen
+                            last_heartbeat_at=last_seen,
+                            anomaly_players_spike=anomaly_flag,
+                            anomaly_last_detected_at=anomaly_last_detected_at
                         )
                     )
                     
@@ -173,12 +194,14 @@ async def process_heartbeat_jobs(
                     # Mark failed, keep pending for retry
                     await jobs_repo.mark_failed(job["id"], str(e), job["attempts"])
                     logger.error(
-                        f"Job processing failed",
+                        "Job processing failed",
                         extra={
                             "job_id": job["id"],
                             "server_id": job["server_id"],
+                            "failure_reason": "processing_exception",
                             "error": str(e),
-                            "attempts": job["attempts"]
+                            "error_type": type(e).__name__,
+                            "attempts": job["attempts"],
                         },
                         exc_info=True
                     )

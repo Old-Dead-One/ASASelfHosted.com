@@ -2,7 +2,7 @@
 
 **These decisions override any mismatches between design documents unless explicitly revised later.**
 
-**Last Updated:** 2024-12-19
+**Last Updated:** 2026-01-22
 
 ---
 
@@ -128,6 +128,26 @@
 - `2_FEATURE_LIST.txt` - **Definitive MVP scope** (90% MVP Scope Lock)
 - `3_TECH_STACK.txt` - Technology stack
 - `4_Dev_Plan.txt` - Development plan (secondary, useful for sequencing)
+
+---
+
+## 9. Agent Authentication Method (Sprint 4)
+
+**Decision:** Use **Ed25519 signature verification** with cluster-based public keys, not HMAC with agent tokens.
+
+**Sprint 4 Implementation:**
+- Cluster stores `public_key_ed25519` (base64-encoded Ed25519 public key)
+- Agent signs heartbeat envelope with cluster's private key
+- Backend verifies signature using cluster's public key
+- Replay protection via `UNIQUE(server_id, heartbeat_id)`
+
+**Rationale:**
+- Aligns with cluster key model in `2_FEATURE_LIST.txt` (lines 95-97): "Private Key: one-to-many (cluster owner), Public Key: one-to-one (server instance)"
+- More secure than HMAC (asymmetric crypto vs symmetric)
+- Supports key rotation via `key_version`
+- Better for cluster identity and multi-server clusters
+
+**Note:** `4_Dev_Plan.txt` mentions HMAC with agent token (line 106), but Ed25519 cluster-based approach is the correct long-term solution and aligns with the cluster key model.
 
 ---
 

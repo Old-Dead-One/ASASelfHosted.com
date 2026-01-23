@@ -126,11 +126,24 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
             raise RuntimeError("Supabase admin client not initialized")
 
         try:
-            from datetime import datetime, timezone
-            
             # Row-level claiming: atomically claim unclaimed pending jobs
             # This prevents multiple workers from claiming the same job
             now = datetime.now(timezone.utc)
+            
+            # Reclaim stale claims (worker crashed after claiming)
+            ttl_seconds = get_settings().HEARTBEAT_JOB_CLAIM_TTL_SECONDS
+            cutoff = now.timestamp() - ttl_seconds
+            cutoff_dt = datetime.fromtimestamp(cutoff, tz=timezone.utc)
+            cutoff_iso = cutoff_dt.isoformat()
+
+            # Set claimed_at back to NULL for stale, unprocessed jobs
+            try:
+                self._supabase.table("heartbeat_jobs").update({
+                    "claimed_at": None
+                }).is_("processed_at", "null").lt("claimed_at", cutoff_iso).execute()
+            except Exception:
+                # Non-fatal; reclaim is best-effort
+                pass
             
             # First, select unclaimed pending jobs
             response = (
@@ -203,7 +216,8 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
 
         try:
             self._supabase.table("heartbeat_jobs").update({
-                "processed_at": processed_at.isoformat()
+                "processed_at": processed_at.isoformat(),
+                "claimed_at": None,  # prevent stuck claims
             }).eq("id", job_id).execute()
         except Exception as e:
             error_str = str(e)
@@ -223,6 +237,7 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
             self._supabase.table("heartbeat_jobs").update({
                 "last_error": error,
                 "attempts": attempts,
+                "claimed_at": None,  # allow retry
                 # Keep processed_at = NULL so job remains pending for retry
             }).eq("id", job_id).execute()
         except Exception as e:

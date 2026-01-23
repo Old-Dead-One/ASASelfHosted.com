@@ -79,6 +79,7 @@ class DirectoryServer(BaseSchema):
     #   - status_source="agent" + is_verified=True = Agent-detected status, listing is verified/curated
     #   - status_source="manual" + is_verified=False = Manually entered status, listing not verified
     last_seen_at: datetime | None = None
+    seconds_since_seen: float | None = None  # Seconds since last_seen_at (computed server-side, null if last_seen_at is null)
     confidence: Confidence | None = None  # RYG logic in Sprint 2
 
     # Timestamps
@@ -174,13 +175,13 @@ class DirectoryResponse(BaseSchema):
     """
     Directory list response.
 
-    Wraps DirectoryServer list with pagination metadata.
+    Wraps DirectoryServer list with cursor pagination metadata.
     """
 
     data: list[DirectoryServer]
-    total: int
-    page: int = 1
-    page_size: int = 50
+    limit: int
+    cursor: str | None = None  # Opaque cursor for next page
+    next_cursor: str | None = None  # Opaque cursor for next page (if more results)
 
     # Optional echo for debugging / client UI (reflects actual applied values)
     rank_by: RankBy | None = None
@@ -229,3 +230,36 @@ class DirectoryFiltersResponse(BaseSchema):
     defaults: dict[str, object] = Field(
         description="Default filter values for UI initial state"
     )
+
+
+class DirectoryCluster(BaseSchema):
+    """
+    Directory cluster response schema.
+    
+    Minimal cluster information for public directory.
+    """
+    
+    id: str
+    name: str
+    slug: str
+    visibility: ClusterVisibility
+    created_at: datetime
+    updated_at: datetime
+    server_count: int = 0  # Number of servers in this cluster (optional, for future)
+
+
+class DirectoryClustersResponse(BaseSchema):
+    """
+    Directory clusters list response.
+    
+    Wraps DirectoryCluster list with cursor pagination metadata.
+    """
+    
+    data: list[DirectoryCluster]
+    limit: int
+    cursor: str | None = None  # Opaque cursor for current page
+    next_cursor: str | None = None  # Opaque cursor for next page (if more results)
+    
+    # Optional echo for debugging / client UI
+    sort_by: str | None = None
+    order: SortOrder | None = None

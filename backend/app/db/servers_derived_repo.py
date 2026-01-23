@@ -44,6 +44,8 @@ class DerivedServerState(TypedDict):
     players_current: int | None
     players_capacity: int | None
     last_heartbeat_at: datetime | None
+    anomaly_players_spike: bool | None  # Anomaly flag (True if spike detected, False if cleared, None if never set)
+    anomaly_last_detected_at: datetime | None  # Timestamp of last detected anomaly (for decay)
 
 
 class ServersDerivedRepository(ABC):
@@ -82,6 +84,19 @@ class ServersDerivedRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_current_anomaly_state(self, server_id: str) -> tuple[bool | None, datetime | None]:
+        """
+        Get current anomaly state for a server.
+        
+        Args:
+            server_id: Server UUID
+            
+        Returns:
+            Tuple of (anomaly_players_spike: bool | None, anomaly_last_detected_at: datetime | None)
+        """
+        ...
+
+    @abstractmethod
     async def update_derived_state(
         self,
         server_id: str,
@@ -97,6 +112,8 @@ class ServersDerivedRepository(ABC):
         - quality_score
         - players_current, players_capacity
         - last_heartbeat_at
+        - anomaly_players_spike
+        - anomaly_last_detected_at
         
         Does NOT update is_verified (listing trust flag, separate concern).
         
@@ -105,3 +122,15 @@ class ServersDerivedRepository(ABC):
             state: DerivedServerState to apply
         """
         ...
+
+    @abstractmethod
+    async def fast_path_update_from_heartbeat(
+        self,
+        server_id: str,
+        received_at: datetime,
+        heartbeat_timestamp: datetime,
+        players_current: int | None,
+        players_capacity: int | None,
+    ) -> None:
+        """Fast UX update of last_seen/players; must NOT overwrite derived metrics."""
+        raise NotImplementedError

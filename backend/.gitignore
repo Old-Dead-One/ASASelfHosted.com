@@ -38,6 +38,9 @@ ENV/
 .env.local
 .env.*.local
 
+# Local env (explicit)
+backend/.env
+
 # Testing
 .pytest_cache/
 .coverage

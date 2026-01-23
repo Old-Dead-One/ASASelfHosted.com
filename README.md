@@ -31,9 +31,10 @@ Production-grade web platform for a vendor-neutral public registry of self-hoste
 - Zod (schema + validation)
 
 ### Backend
-- Python
-- FastAPI
+- Python 3.12
+- FastAPI (with lifespan handlers)
 - Pydantic
+- Ed25519 cryptography (agent authentication)
 
 ### Data & Auth
 - Supabase Postgres
@@ -153,9 +154,12 @@ All API responses follow a consistent format:
 ## Documentation
 
 - `DEV_NOTES.md` - Development notes, decisions, and context (referenced during development)
-- `PROJECT_STRUCTURE.md` - Complete file and folder structure
+- `PROJECT_STRUCTURE.md` - Complete file and folder structure (updated after Sprint 4)
 - `VERIFICATION.md` - Setup and verification checklist
 - `INSTALL.md` - Installation instructions
+- `SUPABASE_SETUP.md` - Supabase project setup and migration guide
+- `DECISIONS.md` - Official decisions (override design docs)
+- `DESIGN_DOC_COMPARISON.md` - Design document alignment tracking
 
 ## License
 

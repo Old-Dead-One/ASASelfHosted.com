@@ -5,14 +5,19 @@ Read-only endpoints for public server directory.
 Uses directory_view read model (mock in Sprint 1, real Supabase in Sprint 2+).
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import get_optional_user
-from app.core.errors import NotFoundError
+from app.core.errors import DomainValidationError, NotFoundError
 from app.core.security import UserIdentity
+from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.db.directory_repo import DirectoryRepository
-from app.db.providers import get_directory_repo
+from app.db.providers import get_directory_clusters_repo, get_directory_repo
 from app.schemas.directory import (
+    DirectoryCluster,
+    DirectoryClustersResponse,
     DirectoryResponse,
     DirectoryFiltersResponse,
     DirectoryServer,
@@ -34,8 +39,8 @@ router = APIRouter(prefix="/directory", tags=["directory"])
 
 @router.get("/servers", response_model=DirectoryResponse)
 async def list_directory_servers(
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(default=50, ge=1, le=100, description="Items per page (max 100)"),
+    limit: int = Query(default=25, ge=1, le=100, description="Maximum items to return (max 100)"),
+    cursor: str | None = Query(default=None, description="Opaque cursor for pagination (from previous response)"),
     q: str | None = Query(default=None, description="Search query (searches name, description, map name, cluster name)"),
     status: ServerStatus | None = Query(default=None, description="Filter by server status"),
     mode: VerificationMode | None = Query(
@@ -107,18 +112,20 @@ async def list_directory_servers(
     _user: UserIdentity | None = Depends(get_optional_user),
 ):
     """
-    List public servers from directory view.
+    List public servers from directory view with cursor pagination.
 
     Public endpoint - no authentication required.
     Returns servers from directory_view (public read model).
     
-    Pagination and filtering are supported.
-    Search, status, and verification mode filters are optional.
-    
-    Results are ordered by most recently updated (updated_at DESC).
+    Cursor pagination provides deterministic results under concurrent updates.
+    Use `cursor` from previous response to get next page.
     
     User context is available for personalized data (favorites, etc.) in future.
     """
+    # Enforce max limit (400 error if > 100)
+    if limit > 100:
+        raise DomainValidationError(f"limit must be <= 100, got {limit}")
+    
     # Normalize players_min/max to players_current_min/max for repository
     # Use explicit None check (0 is valid and falsy)
     effective_players_min = players_current_min if players_current_min is not None else players_min
@@ -127,9 +134,12 @@ async def list_directory_servers(
     # Enforce precedence: if both ruleset and server_type are provided, ruleset takes precedence
     effective_server_type = None if ruleset else server_type
 
-    servers, total = await repo.list_servers(
-        page=page,
-        page_size=page_size,
+    # Get request handling time (consistent across all items in response)
+    now_utc = datetime.now(timezone.utc)
+
+    servers, next_cursor = await repo.list_servers(
+        limit=limit,
+        cursor=cursor,
         q=q,
         status=status,
         mode=mode,
@@ -155,13 +165,14 @@ async def list_directory_servers(
         maps=maps,
         mods=mods,
         platforms=platforms,
+        now_utc=now_utc,
     )
 
     return DirectoryResponse(
         data=list(servers),
-        total=total,
-        page=page,
-        page_size=page_size,
+        limit=limit,
+        cursor=cursor,
+        next_cursor=next_cursor,
         rank_by=rank_by,
         order=order,
         view=view,
@@ -205,6 +216,92 @@ async def get_directory_filters(
     # If not implemented, repo will raise app.core.errors.NotImplementedError (HTTP 501)
     filters = await repo.get_filters()
     return filters
+
+
+@router.get("/clusters", response_model=DirectoryClustersResponse)
+async def list_directory_clusters(
+    limit: int = Query(default=25, ge=1, le=100, description="Maximum items to return (max 100)"),
+    cursor: str | None = Query(default=None, description="Opaque cursor for pagination (from previous response)"),
+    visibility: ClusterVisibility | None = Query(
+        default=None, description="Filter by visibility (public/unlisted). If None, returns public only."
+    ),
+    sort_by: str = Query(default="updated", description="Sort clusters by (updated or name)"),
+    order: SortOrder = Query(default="desc", description="Sort order for sort_by"),
+    repo: DirectoryClustersRepository = Depends(get_directory_clusters_repo),
+    _user: UserIdentity | None = Depends(get_optional_user),
+):
+    """
+    List public clusters from directory with cursor pagination.
+
+    Public endpoint - no authentication required.
+    Returns clusters from clusters table.
+    
+    Cursor pagination provides deterministic results under concurrent updates.
+    Use `cursor` from previous response to get next page.
+    
+    Visibility Rules:
+        - If visibility is None: returns only public clusters (default)
+        - If visibility is "public": returns only public clusters
+        - If visibility is "unlisted": returns only unlisted clusters (requires explicit filter)
+    """
+    # Enforce max limit (400 error if > 100)
+    if limit > 100:
+        raise DomainValidationError(f"limit must be <= 100, got {limit}")
+    
+    # Validate sort_by
+    if sort_by not in ("updated", "name"):
+        raise DomainValidationError(f"sort_by must be 'updated' or 'name', got {sort_by}")
+    
+    # Get request handling time (consistent across all items in response)
+    now_utc = datetime.now(timezone.utc)
+
+    clusters, next_cursor = await repo.list_clusters(
+        limit=limit,
+        cursor=cursor,
+        visibility=visibility,
+        sort_by=sort_by,
+        order=order,
+        now_utc=now_utc,
+    )
+
+    return DirectoryClustersResponse(
+        data=list(clusters),
+        limit=limit,
+        cursor=cursor,
+        next_cursor=next_cursor,
+        sort_by=sort_by,
+        order=order,
+    )
+
+
+@router.get("/clusters/{cluster_id}", response_model=DirectoryCluster)
+async def get_directory_cluster(
+    cluster_id: str,
+    repo: DirectoryClustersRepository = Depends(get_directory_clusters_repo),
+    _user: UserIdentity | None = Depends(get_optional_user),
+):
+    """
+    Get cluster details by ID from directory.
+
+    Public endpoint - returns cluster if it's accessible.
+    
+    Visibility Rules:
+        - public: returns cluster (readable by everyone)
+        - unlisted: returns cluster if found (may require owner authentication due to RLS)
+        - private: does not exist in DB enum, so not applicable
+    
+    Note: Unlisted clusters may not be accessible via this endpoint if RLS policies
+    restrict access to owners only. This is a known limitation that may require
+    RLS policy adjustments for full unlisted cluster support.
+    """
+    # Get request handling time
+    now_utc = datetime.now(timezone.utc)
+    
+    cluster = await repo.get_cluster(cluster_id, now_utc=now_utc)
+    if not cluster:
+        raise NotFoundError("cluster", cluster_id)
+
+    return cluster
 
 
 @router.post("/servers/search", include_in_schema=False)

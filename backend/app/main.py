@@ -27,16 +27,18 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger = logging.getLogger("asaselfhosted.startup")
+    settings = get_settings()
+
     try:
-        from app.workers.heartbeat_worker import process_heartbeat_jobs
-        
-        # Start heartbeat worker as background task (non-blocking)
-        asyncio.create_task(process_heartbeat_jobs())
-        logger.info("Heartbeat worker started as background task")
+        if settings.ENV != "test" and settings.RUN_HEARTBEAT_WORKER:
+            from app.workers.heartbeat_worker import process_heartbeat_jobs
+            asyncio.create_task(process_heartbeat_jobs())
+            logger.info("Heartbeat worker started as background task")
+        else:
+            logger.info("Heartbeat worker not started", extra={"env": settings.ENV})
     except Exception as e:
-        # Non-fatal - worker can be started separately if needed
-        logger.warning(f"Failed to start heartbeat worker (non-fatal): {e}")
-    
+        logger.exception("Failed to start heartbeat worker", extra={"error": str(e)})
+
     yield  # App runs here
     
     # Shutdown (if needed in future)
@@ -123,8 +125,10 @@ def create_app() -> FastAPI:
 
     # Add request ID middleware (must be before error handlers)
     from app.middleware.request_id import request_id_middleware
+    from app.middleware.timing import request_timing_middleware
 
     app.middleware("http")(request_id_middleware)
+    app.middleware("http")(request_timing_middleware)
 
     # Setup error handlers (after middleware so request_id is available)
     setup_error_handlers(app)

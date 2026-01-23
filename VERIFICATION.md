@@ -173,9 +173,22 @@ npm run dev
 
 Once both servers run successfully:
 
-1. **API Contract Draft** - Define server/cluster/heartbeat schemas
-2. **Supabase Schema** - Design tables + RLS policies
-3. **Auth Wiring** - Supabase Auth integration
-4. **Server Directory MVP** - Basic listing pages
-5. **Verification System** - Cryptographic verification
-6. **Consent UX** - Dual-consent model implementation
+1. **Supabase Setup** - Run migrations (001, 003, 006) - see `SUPABASE_SETUP.md`
+2. **API Contract** - Server/cluster/heartbeat schemas (Sprint 1-4 complete)
+3. **Auth Wiring** - Supabase Auth integration (Sprint 1 complete)
+4. **Server Directory** - Basic listing pages (Sprint 1-3 complete)
+5. **Agent Verification** - Ed25519 signature verification (Sprint 4 complete)
+6. **Consent UX** - Dual-consent model implementation (future)
+
+## Sprint 4 Verification
+
+After Sprint 4 implementation:
+
+- [ ] Migration 006 applied successfully
+- [ ] `heartbeat_jobs` table exists
+- [ ] `clusters.public_key_ed25519` column exists
+- [ ] `heartbeats.heartbeat_id` column exists with unique constraint
+- [ ] Heartbeat worker starts on app startup (check logs)
+- [ ] Tests pass: `pytest -q --disable-warnings`
+- [ ] Crypto module: Ed25519 signature verification works
+- [ ] Engines: Status, confidence, uptime, quality engines compute correctly

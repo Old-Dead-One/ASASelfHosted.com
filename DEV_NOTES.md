@@ -193,4 +193,4 @@ Always remind to commit after significant work to prevent data loss.
 
 ---
 
-*Last updated: 2024-12-19 - Official decisions documented*
+*Last updated: 2026-01-22 - Sprint 4 complete (agent pipeline, heartbeat processing, derived metrics)*

@@ -13,7 +13,7 @@ source .venv/bin/activate  # mac/linux
 # .venv\Scripts\activate    # windows
 
 pip install --upgrade pip
-pip install fastapi "uvicorn[standard]" pydantic pydantic-settings python-dotenv httpx supabase
+pip install fastapi "uvicorn[standard]" pydantic pydantic-settings python-dotenv httpx supabase cryptography
 ```
 
 **Note:** `sentry-sdk` is commented out in `requirements.txt`. Uncomment it when you're ready to add monitoring.

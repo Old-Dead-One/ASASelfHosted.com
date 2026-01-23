@@ -29,6 +29,7 @@ jobs:
         working-directory: ./backend
         env:
           ENV: test
+          RUN_HEARTBEAT_WORKER: "false"
           SUPABASE_URL: ""
           SUPABASE_ANON_KEY: ""
           SUPABASE_SERVICE_ROLE_KEY: ""

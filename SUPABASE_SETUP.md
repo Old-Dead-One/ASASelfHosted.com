@@ -47,6 +47,14 @@ Once your project is ready:
 
 1. Open `backend/app/db/migrations/003_sprint_3_directory_view.sql` in your editor
 2. Copy the entire contents
+3. Paste into Supabase SQL Editor
+4. Click "Run" (or press Cmd/Ctrl + Enter)
+5. Verify success (should see "Success. No rows returned")
+
+### Migration 3: Sprint 4 Agent Authentication
+
+1. Open `backend/app/db/migrations/006_sprint_4_agent_auth.sql` in your editor
+2. Copy the entire contents
 3. Paste into the SQL Editor
 4. Click "Run"
 5. Wait for execution to complete
@@ -144,7 +152,7 @@ SELECT * FROM directory_view LIMIT 5;
 ### "Failed to query directory_view" Error
 
 - Verify `directory_view` exists in Supabase (Database → Views)
-- Check that migrations ran successfully
+- Check that all migrations ran successfully (001, 003, 006)
 - Verify RLS policies allow public read access
 
 ### Migration Errors

@@ -21,13 +21,14 @@ from app.core.errors import (
     UnauthorizedError,
 )
 from app.core.heartbeat import get_grace_window_seconds
-from app.core.supabase import get_supabase_admin
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
 from app.db.providers import (
     get_heartbeat_jobs_repo,
     get_heartbeat_repo,
+    get_servers_derived_repo,
 )
+from app.db.servers_derived_repo import ServersDerivedRepository
 from app.middleware.rate_limit import heartbeat_rate_limit
 from app.schemas.heartbeat import HeartbeatRequest, HeartbeatResponse
 
@@ -41,6 +42,7 @@ async def ingest_heartbeat(
     heartbeat: HeartbeatRequest,
     heartbeat_repo: HeartbeatRepository = Depends(get_heartbeat_repo),
     jobs_repo: HeartbeatJobsRepository = Depends(get_heartbeat_jobs_repo),
+    derived_repo: ServersDerivedRepository = Depends(get_servers_derived_repo),
 ):
     """
     Ingest signed heartbeat from server agent.
@@ -66,50 +68,42 @@ async def ingest_heartbeat(
     heartbeat_rate_limit(request, heartbeat.server_id)
     
     # 2. Load server and cluster by server_id
-    supabase_admin = get_supabase_admin()
-    if not supabase_admin:
-        raise RuntimeError("Supabase admin client not configured")
-    
-    # Get server with cluster info
-    server_response = (
-        supabase_admin.table("servers")
-        .select("id,cluster_id,clusters!inner(id,key_version,public_key_ed25519,heartbeat_grace_seconds)")
-        .eq("id", heartbeat.server_id)
-        .limit(1)
-        .execute()
-    )
-    
-    server_data = server_response.data if hasattr(server_response, "data") else []
-    if not server_data:
-        logger.warning(f"Heartbeat rejected: server not found", extra={"server_id": heartbeat.server_id})
-        raise NotFoundError("server", heartbeat.server_id)
-    
-    server = server_data[0]
-    cluster = server.get("clusters", {})
-    
-    # 3. Validate cluster has public_key_ed25519
-    public_key_ed25519 = cluster.get("public_key_ed25519")
-    if not public_key_ed25519:
+    server_cluster = await derived_repo.get_server_cluster_and_grace(heartbeat.server_id)
+    if not server_cluster:
         logger.warning(
-            f"Heartbeat rejected: cluster missing public_key_ed25519",
-            extra={"server_id": heartbeat.server_id, "cluster_id": cluster.get("id")}
-        )
-        raise UnauthorizedError("Cluster missing public_key_ed25519 for signature verification")
-    
-    # 4. Key version check
-    cluster_key_version = cluster.get("key_version", 1)
-    if heartbeat.key_version != cluster_key_version:
-        logger.warning(
-            f"Heartbeat rejected: key version mismatch",
+            "Heartbeat rejected: server not found",
             extra={
                 "server_id": heartbeat.server_id,
-                "expected": cluster_key_version,
-                "received": heartbeat.key_version
+                "rejection_reason": "server_not_found",
+                "heartbeat_id": heartbeat.heartbeat_id,
             }
         )
-        raise KeyVersionMismatchError(cluster_key_version, heartbeat.key_version)
+        raise NotFoundError("server", heartbeat.server_id)
+
+    public_key_ed25519 = server_cluster.get("public_key_ed25519")
+    if not public_key_ed25519:
+        logger.warning(
+            "Heartbeat rejected: cluster missing public_key_ed25519",
+            extra={
+                "server_id": heartbeat.server_id,
+                "cluster_id": server_cluster.get("cluster_id"),
+                "rejection_reason": "cluster_missing_public_key",
+                "heartbeat_id": heartbeat.heartbeat_id,
+            }
+        )
+        raise UnauthorizedError("Cluster missing public_key_ed25519 for signature verification")
+
+    cluster_key_version = server_cluster.get("key_version", 1)
+    if heartbeat.key_version != cluster_key_version:
+        raise KeyVersionMismatchError(
+            expected=cluster_key_version,
+            got=heartbeat.key_version,
+        )
+
+    cluster_grace_seconds = server_cluster.get("heartbeat_grace_seconds")
+    grace_window = get_grace_window_seconds(cluster_grace_seconds)
     
-    # 5. Verify signature (Ed25519)
+    # 3. Verify signature (Ed25519)
     # Canonicalize envelope (exclude signature, payload)
     envelope = {
         "server_id": heartbeat.server_id,
@@ -132,15 +126,19 @@ async def ingest_heartbeat(
     
     if not signature_valid:
         logger.warning(
-            f"Heartbeat rejected: invalid signature",
-            extra={"server_id": heartbeat.server_id, "cluster_id": cluster.get("id")}
+            "Heartbeat rejected: invalid signature",
+            extra={
+                "server_id": heartbeat.server_id,
+                "cluster_id": server_cluster.get("cluster_id"),
+                "rejection_reason": "invalid_signature",
+                "heartbeat_id": heartbeat.heartbeat_id,
+                "key_version": heartbeat.key_version,
+            }
         )
         raise SignatureVerificationError("Invalid Ed25519 signature")
     
-    # 6. Timestamp validation
+    # 4. Timestamp validation
     now = datetime.now(timezone.utc)
-    cluster_grace_override = cluster.get("heartbeat_grace_seconds")
-    grace_window = get_grace_window_seconds(cluster_grace_override)
     
     # Ensure heartbeat.timestamp is timezone-aware
     if heartbeat.timestamp.tzinfo is None:
@@ -153,11 +151,14 @@ async def ingest_heartbeat(
     # Reject if stale beyond grace window
     if time_delta > grace_window:
         logger.warning(
-            f"Heartbeat rejected: timestamp stale",
+            "Heartbeat rejected: timestamp stale",
             extra={
                 "server_id": heartbeat.server_id,
-                "delta_seconds": time_delta,
-                "grace_window": grace_window
+                "rejection_reason": "timestamp_stale",
+                "heartbeat_id": heartbeat.heartbeat_id,
+                "timestamp": heartbeat.timestamp.isoformat() if heartbeat.timestamp else None,
+                "grace_window_seconds": grace_window,
+                "time_since_timestamp": time_delta,
             }
         )
         raise HTTPException(
@@ -168,13 +169,17 @@ async def ingest_heartbeat(
     # Reject if > 60s in future (clock skew violation)
     if time_delta < -60:
         logger.warning(
-            f"Heartbeat rejected: clock skew violation (timestamp too far in future)",
+            "Heartbeat rejected: clock skew violation (timestamp too far in future)",
             extra={
                 "server_id": heartbeat.server_id,
+                "rejection_reason": "clock_skew_violation",
+                "heartbeat_id": heartbeat.heartbeat_id,
+                "timestamp": heartbeat.timestamp.isoformat() if heartbeat.timestamp else None,
+                "time_ahead": abs(time_delta),
                 "delta_seconds": time_delta,
                 "agent_timestamp": heartbeat_timestamp.isoformat(),
                 "server_timestamp": now.isoformat(),
-                "agent_version": heartbeat.agent_version
+                "agent_version": heartbeat.agent_version,
             }
         )
         raise HTTPException(
@@ -182,12 +187,12 @@ async def ingest_heartbeat(
             detail=f"Heartbeat timestamp is too far in future (clock skew: {time_delta:.0f}s). Agent clock may be incorrect."
         )
     
-    # 7. Insert heartbeat (append-only)
+    # 5. Insert heartbeat (append-only)
     received_at = now
     result = await heartbeat_repo.create_heartbeat(
         heartbeat,
         received_at,
-        server_cluster_id=cluster.get("id")
+        server_cluster_id=server_cluster.get("cluster_id")
     )
     
     # Handle replay (idempotent - return 202 with replay=True)
@@ -203,40 +208,26 @@ async def ingest_heartbeat(
             replay=True
         )
     
-    # 8. Fast path server update
+    # 6. Fast path server update
     try:
-        update_data = {
-            "last_seen_at": received_at.isoformat(),
-            "last_heartbeat_at": heartbeat_timestamp.isoformat(),
-            "status_source": "agent",
-        }
-        
-        # Optionally update players_current, players_capacity for UI convenience
-        if heartbeat.players_current is not None:
-            update_data["players_current"] = heartbeat.players_current
-        if heartbeat.players_capacity is not None:
-            update_data["players_capacity"] = heartbeat.players_capacity
-        
-        # Optionally set effective_status='online' if signature valid (fast UX)
-        # Worker will correct this later if needed
-        update_data["effective_status"] = "online"
-        
-        supabase_admin.table("servers").update(update_data).eq("id", heartbeat.server_id).execute()
-        
-        processed = True
-        logger.debug(
-            f"Heartbeat fast-path update succeeded",
-            extra={"server_id": heartbeat.server_id}
+        await derived_repo.fast_path_update_from_heartbeat(
+            server_id=heartbeat.server_id,
+            received_at=received_at,
+            heartbeat_timestamp=heartbeat_timestamp,
+            players_current=heartbeat.players_current,
+            players_capacity=heartbeat.players_capacity,
         )
+        processed = True
+        logger.debug("Heartbeat fast-path update succeeded", extra={"server_id": heartbeat.server_id})
     except Exception as e:
         processed = False
         logger.warning(
-            f"Heartbeat fast-path update failed (non-fatal)",
-            extra={"server_id": heartbeat.server_id, "error": str(e)}
+            "Heartbeat fast-path update failed (non-fatal)",
+            extra={"server_id": heartbeat.server_id, "error": str(e)},
         )
         # Non-fatal - worker will update later
     
-    # 9. Enqueue server_id for worker (durable queue)
+    # 7. Enqueue server_id for worker (durable queue)
     try:
         await jobs_repo.enqueue_server(heartbeat.server_id)
     except Exception as e:
@@ -246,7 +237,7 @@ async def ingest_heartbeat(
         )
         # Non-fatal - heartbeat was persisted, worker can catch up
     
-    # 10. Return 202 Accepted
+    # 8. Return 202 Accepted
     return HeartbeatResponse(
         received=True,
         server_id=heartbeat.server_id,

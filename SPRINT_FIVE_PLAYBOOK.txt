@@ -1,0 +1,136 @@
+Sprint 5 — Directory Readiness & External Consumption
+
+Sprint Theme:
+Make the data trustworthy, consumable, and safe to expose.
+Sprint 4 proved ingestion and derivation. Sprint 5 hardens read paths, ranking, and public-facing correctness.
+Sprint 5 Goals (Non-Negotiable)
+Public directory reads are correct, fast, and deterministic
+Derived metrics behave predictably over time
+Ranking & sorting are stable and abuse-resistant
+No new write paths introduced
+No Supabase leakage outside repositories
+
+5.1 Directory Read APIs (Read-Only, Stable)
+
+Scope:
+/directory/servers
+/directory/servers/{id}
+/directory/clusters
+/directory/clusters/{id}
+Requirements
+Read-only
+Pagination required (cursor or offset, your choice)
+Explicit sort keys (no implicit ordering)
+No joins in routes — repositories only
+Must-Haves
+
+Filters:
+status=online|offline
+ruleset
+cluster_visibility=public|unlisted
+map
+
+Sorting:
+updated
+players
+quality
+uptime
+Default sort is explicit, not DB-dependent
+Deliverables
+DirectoryServersRepository
+DirectoryClustersRepository
+Contract tests for response shape & ordering
+
+5.2 Ranking & Scoring Hardening
+Sprint 4 introduced engines. Sprint 5 makes them predictable.
+Quality Score
+Clamp outputs (0–100)
+Monotonic decay only (no oscillation)
+Clearly defined “unknown” behavior
+Uptime
+Confirm rolling window logic is:
+Based on received_at
+Stable across restarts
+Add regression tests for:
+Long offline gap
+Flapping servers
+Cold-start servers
+Confidence
+Explicit downgrade rules
+No sudden jumps from red → green without sustained signal
+
+Deliverables:
+Engine invariants documented inline
+Property-style tests (inputs → bounded outputs)
+
+5.3 Anti-Gaming Guards (Read-Time)
+You’re about to expose rankings. Assume adversarial behavior.
+Required Guards
+Cap players_current contribution to ranking
+Diminishing returns for uptime beyond threshold
+Ignore impossible heartbeats (e.g., 0→70→0 in seconds)
+Where This Lives
+In ranking logic, not ingestion
+Read-time computation or cached derived fields (your choice)
+
+Deliverables:
+One place where “ranking math” lives
+Tests that demonstrate gaming attempts failing
+
+5.4 Snapshot Consistency & Caching
+Directory reads must not flicker.
+Requirements
+Reads must be:
+Repeatable within a request
+Not partially updated mid-read
+Acceptable approaches:
+Transaction-scoped reads
+Read replicas (future)
+Materialized “directory view” table (optional)
+
+Deliverables:
+Explicit consistency model (documented)
+No ad-hoc .table("servers") calls in routes
+
+5.5 Observability (Lightweight, Targeted)
+No dashboards yet — just correctness signals.
+Required Metrics
+Heartbeats accepted / rejected (by reason)
+Jobs processed / failed / retried
+Directory read latency (p50/p95)
+Logging
+
+One structured log per:
+heartbeat rejection
+job failure
+directory read error
+
+5.6 Test Expansion (Critical)
+Sprint 5 should raise confidence, not just add features.
+Required Tests
+Directory endpoints (filter + sort correctness)
+Ranking stability over time
+Engine boundary conditions
+
+Regression test for:
+replay heartbeats
+worker crash + recovery
+stale servers decaying properly
+CI Requirement
+Still zero Supabase/network dependency
+ENV=test remains fully hermetic
+
+Explicitly Out of Scope (Do Not Drift):
+Auth changes
+Agent protocol changes
+Write-path refactors
+Paid features
+UI/frontend concerns
+Sprint 5 “Done” Definition
+Sprint 5 is complete when:
+Directory endpoints can be safely exposed publicly
+Rankings do not oscillate or get gamed
+Derived metrics degrade gracefully over time
+CI remains fast, hermetic, and boring
+
+No TODOs left in ranking/engine logic
