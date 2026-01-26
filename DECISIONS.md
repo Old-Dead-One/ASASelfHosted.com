@@ -151,4 +151,38 @@
 
 ---
 
+## 10. Directory Read Consistency Model (Sprint 5)
+
+**Decision:** Directory reads use transaction-scoped reads from `directory_view` with cursor pagination for determinism.
+
+**Consistency Guarantees:**
+- **Repeatable within request**: All items in a single response use the same `now_utc` timestamp (request handling time)
+- **No partial updates mid-read**: Single query from `directory_view` ensures atomic snapshot
+- **Cursor pagination determinism**: Cursor encodes `{sort_by, order, last_value, last_id}` for stable pagination
+
+**Cursor Pagination Determinism Limitations:**
+- **Stable sort keys required**: Cursor pagination is deterministic **only if sort keys remain stable** between requests
+- **No duplicates within traversal**: Assuming stable ordering and correct cursor seek predicates, no item appears twice in a single traversal
+- **Concurrent updates may shift items**: Under concurrent writes, items may shift between pages (expected behavior)
+- **Duplicates possible if sort keys change**: If a server's sort key (e.g., `updated_at`) changes between page requests, it may appear on multiple pages
+- **Cursors remain valid**: Cursors reduce (but don't eliminate) pagination issues under churn
+
+**Implementation:**
+- All directory reads go through repositories (no direct Supabase calls in routes)
+- `directory_view` COALESCEs nullable sort columns to 0 for deterministic sorting
+- Tie-break ordering: `ORDER BY sort_key, id` (id as deterministic tie-breaker)
+- `seconds_since_seen` computed server-side using consistent `now_utc` across all items in response
+
+**Rationale:**
+- Transaction-scoped reads provide consistency without read replicas (future optimization)
+- Cursor pagination is more deterministic than offset-based pagination under concurrent writes
+- COALESCE to 0 ensures NULL values don't break cursor pagination (NULLs treated as 0 for sorting)
+- Explicit tie-break ordering (id) ensures deterministic ordering even when sort keys are equal
+
+**Future Optimizations:**
+- Read replicas for better read scalability (not in Sprint 5)
+- Materialized view refresh strategy (if needed for stronger consistency guarantees)
+
+---
+
 *When in doubt, refer to these decisions. They override any conflicting information in the design documents.*

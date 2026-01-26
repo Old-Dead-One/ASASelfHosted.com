@@ -693,12 +693,24 @@ class MockDirectoryRepository(DirectoryRepository):
                 return s.uptime_percent
             else:
                 return s.updated_at
-
+        
         # Ranking/sorting with tie-break (id always ASC)
+        # Handle NULL values: None sorts last (for both ASC and DESC)
         reverse = order == "desc"
         
+        def _sort_key(s: DirectoryServer) -> tuple:
+            """Sort key that handles NULL values properly."""
+            sort_value = _get_sort_value(s, rank_by)
+            # For NULL values, use a sentinel that sorts last
+            # Use (0, False) for None in DESC (sorts last), (1, True) for None in ASC (also sorts last)
+            if sort_value is None:
+                # None values sort last regardless of order
+                # Use a tuple that will always be greater than any real value
+                return (float('inf') if reverse else float('-inf'), s.id)
+            return (sort_value, s.id)
+        
         # Sort by sort key, then id (tie-break)
-        servers.sort(key=lambda s: (_get_sort_value(s, rank_by), s.id), reverse=reverse)
+        servers.sort(key=_sort_key, reverse=reverse)
         
         # Apply cursor seek predicate
         if parsed_cursor:

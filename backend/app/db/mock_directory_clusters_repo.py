@@ -78,33 +78,42 @@ class MockDirectoryClustersRepository(DirectoryClustersRepository):
             raise DomainValidationError(f"limit must be <= 100, got {limit}")
         
         # Parse and validate cursor
-        parsed_cursor = parse_cursor(cursor)
-        if parsed_cursor:
-            parsed_cursor.validate_match(sort_by, order)
+        parsed_cursor = None
+        if cursor:
+            parsed_cursor = parse_cursor(cursor)
+            if parsed_cursor:
+                parsed_cursor.validate_match(sort_by, order)
         
         # Filter by visibility
+        # Reject unlisted: public directory is public-only
+        if visibility == "unlisted":
+            raise DomainValidationError(
+                "Unlisted clusters are not accessible via public directory. Only 'public' is supported."
+            )
+        
         filtered_clusters = list(MOCK_CLUSTERS)
         if visibility is not None:
-            filtered_clusters = [c for c in filtered_clusters if c["visibility"] == visibility]
+            # visibility is "public" (unlisted already rejected above)
+            filtered_clusters = [c for c in filtered_clusters if c.visibility == visibility]
         else:
             # Default: public only
-            filtered_clusters = [c for c in filtered_clusters if c["visibility"] == "public"]
+            filtered_clusters = [c for c in filtered_clusters if c.visibility == "public"]
         
         # Sort clusters
         def _get_sort_value(cluster: DirectoryCluster, sort_key: str) -> Any:
             """Get sort value for a cluster."""
             if sort_key == "updated":
-                return cluster["updated_at"]
+                return cluster.updated_at
             elif sort_key == "name":
-                return cluster["name"].lower()
+                return cluster.name.lower()
             else:
                 # Default to updated_at
-                return cluster["updated_at"]
+                return cluster.updated_at
         
         # Sort by sort_key and id (tie-breaker)
         reverse = order == "desc"
         filtered_clusters.sort(
-            key=lambda c: (_get_sort_value(c, sort_by), c["id"]),
+            key=lambda c: (_get_sort_value(c, sort_by), c.id),
             reverse=reverse
         )
         
@@ -117,7 +126,7 @@ class MockDirectoryClustersRepository(DirectoryClustersRepository):
             seeked_clusters = []
             for cluster in filtered_clusters:
                 sort_value = _get_sort_value(cluster, sort_by)
-                cluster_id = cluster["id"]
+                cluster_id = cluster.id
                 
                 if order == "desc":
                     # DESC: skip if sort_value > last_value, or (sort_value == last_value and id >= last_id)
@@ -149,7 +158,7 @@ class MockDirectoryClustersRepository(DirectoryClustersRepository):
                 sort_by=sort_by,
                 order=order,
                 last_value=last_sort_value,
-                last_id=last_cluster["id"]
+                last_id=last_cluster.id
             )
         
         return paginated_clusters, next_cursor
@@ -170,6 +179,6 @@ class MockDirectoryClustersRepository(DirectoryClustersRepository):
             DirectoryCluster if found, None otherwise
         """
         for cluster in MOCK_CLUSTERS:
-            if cluster["id"] == cluster_id:
+            if cluster.id == cluster_id:
                 return cluster
         return None

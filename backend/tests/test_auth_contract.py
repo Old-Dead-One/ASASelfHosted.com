@@ -12,14 +12,23 @@ These are "did I break auth?" alarms, not comprehensive test coverage.
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.main import app
+from app.db.mock_directory_repo import MockDirectoryRepository
+from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
+from app.db.providers import get_directory_repo, get_directory_clusters_repo
 
 
 @pytest.fixture
 def client():
-    """Create test client."""
-    app = create_app()
-    return TestClient(app)
+    """Create test client with mock repositories."""
+    # Override dependencies to use mock repos
+    app.dependency_overrides[get_directory_repo] = lambda: MockDirectoryRepository()
+    app.dependency_overrides[get_directory_clusters_repo] = lambda: MockDirectoryClustersRepository()
+    
+    yield TestClient(app)
+    
+    # Clean up
+    app.dependency_overrides.clear()
 
 
 def test_directory_servers_public(client: TestClient):
