@@ -6,8 +6,6 @@ Tests uptime percentage computation over rolling window.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from app.db.servers_derived_repo import Heartbeat
 from app.engines.uptime_engine import compute_uptime_percent
 

@@ -4,8 +4,6 @@ Tests for ranking engine.
 Tests ranking score computation and invariants (determinism, same inputs → same output).
 """
 
-import pytest
-
 from app.engines.ranking import ServerRankingData, compute_ranking_score
 
 

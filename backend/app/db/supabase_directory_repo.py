@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from app.core.config import get_settings
-from app.core.errors import DomainValidationError, NotImplementedError
+from app.core.errors import DomainValidationError
 from app.db.directory_repo import DirectoryRepository
 from app.schemas.directory import (
     DirectoryServer,
@@ -448,9 +448,6 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     # Compute seconds_since_seen = now_utc - last_seen_at
                     delta = (now_utc - last_seen_dt).total_seconds()
                     seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
-                
-                # Get sort key value for cursor generation
-                sort_value = row.get(sort_column)
                 
                 # Create DirectoryServer with rank fields and seconds_since_seen
                 server = DirectoryServer(

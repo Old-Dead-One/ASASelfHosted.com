@@ -5,9 +5,7 @@ Tests Ed25519 signature verification and canonical envelope serialization.
 """
 
 import base64
-from datetime import datetime, timezone
 
-import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app.core.crypto import canonicalize_heartbeat_envelope, verify_ed25519_signature

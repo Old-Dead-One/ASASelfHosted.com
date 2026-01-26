@@ -6,8 +6,6 @@ Tests RYG confidence computation.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from app.db.servers_derived_repo import Heartbeat
 from app.engines.confidence_engine import compute_confidence
 

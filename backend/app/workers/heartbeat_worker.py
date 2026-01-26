@@ -94,7 +94,7 @@ async def process_heartbeat_jobs(
                         # This preserves manual status_source and effective_status
                         await jobs_repo.mark_processed(job["id"], datetime.now(timezone.utc))
                         logger.debug(
-                            f"Job processed: no agent heartbeats (preserving manual status)",
+                            "Job processed: no agent heartbeats (preserving manual status)",
                             extra={"job_id": job["id"], "server_id": job["server_id"]}
                         )
                         continue
@@ -155,7 +155,7 @@ async def process_heartbeat_jobs(
                     
                     # Log status transition (if changed)
                     logger.debug(
-                        f"Engine outputs",
+                        "Engine outputs",
                         extra={
                             "server_id": job["server_id"],
                             "status": status,
@@ -188,7 +188,7 @@ async def process_heartbeat_jobs(
                     await jobs_repo.mark_processed(job["id"], datetime.now(timezone.utc))
                     
                     logger.debug(
-                        f"Job processed successfully",
+                        "Job processed successfully",
                         extra={"job_id": job["id"], "server_id": job["server_id"]}
                     )
                     
@@ -217,14 +217,14 @@ async def process_heartbeat_jobs(
             # Check for missing table error (migration not run)
             if "heartbeat_jobs" in error_str.lower() and ("not find" in error_str.lower() or "schema cache" in error_str.lower()):
                 logger.error(
-                    f"Heartbeat worker: migration not run. Please run 006_sprint_4_agent_auth.sql in Supabase.",
+                    "Heartbeat worker: migration not run. Please run 006_sprint_4_agent_auth.sql in Supabase.",
                     extra={"error": error_str}
                 )
                 # Sleep longer before retrying (don't spam logs)
                 await asyncio.sleep(60)  # Wait 60 seconds before retrying
             else:
                 logger.error(
-                    f"Heartbeat worker error (non-fatal, continuing)",
+                    "Heartbeat worker error (non-fatal, continuing)",
                     extra={"error": str(e)},
                     exc_info=True
                 )

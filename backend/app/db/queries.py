@@ -11,7 +11,7 @@ This forces explicit choice of client at call sites:
 - supabase_admin: Admin operations (webhooks, maintenance)
 """
 
-from supabase import Client
+# from supabase import Client  # TODO: Implement common database query functions
 
 # TODO: Implement common database query functions
 # TODO: Server queries

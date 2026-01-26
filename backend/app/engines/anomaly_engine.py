@@ -5,7 +5,7 @@ Detects impossible or suspicious player count changes that indicate gaming/abuse
 Computed as derived metrics (stored alongside other derived fields).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from app.db.servers_derived_repo import Heartbeat
 

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.deps import get_optional_user, require_user
 from app.core.security import UserIdentity
 from app.schemas.base import SuccessResponse
-from app.schemas.directory import DirectoryResponse, DirectoryServer
+from app.schemas.directory import DirectoryResponse
 from app.schemas.servers import (
     ServerCreateRequest,
     ServerOwnerResponse,

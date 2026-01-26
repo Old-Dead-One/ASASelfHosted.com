@@ -126,7 +126,6 @@ class FakeDerivedRepoForWorker(ServersDerivedRepository):
 async def test_worker_crash_mid_processing():
     """Regression test: Worker crash mid-processing (claimed jobs)."""
     jobs_repo = FakeHeartbeatJobsRepo()
-    derived_repo = FakeDerivedRepoForWorker()
     
     # Enqueue a job
     await jobs_repo.enqueue_server("server-1")
@@ -210,7 +209,6 @@ async def test_jobs_retried_after_worker_restart():
 async def test_no_duplicate_processing():
     """Regression test: No duplicate processing."""
     jobs_repo = FakeHeartbeatJobsRepo()
-    derived_repo = FakeDerivedRepoForWorker()
     
     # Enqueue a job
     await jobs_repo.enqueue_server("server-1")

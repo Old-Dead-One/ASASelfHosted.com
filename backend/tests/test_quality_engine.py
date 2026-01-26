@@ -4,9 +4,6 @@ Tests for quality engine.
 Tests quality score computation.
 """
 
-import pytest
-
-from app.db.servers_derived_repo import Heartbeat
 from app.engines.quality_engine import compute_quality_score
 
 

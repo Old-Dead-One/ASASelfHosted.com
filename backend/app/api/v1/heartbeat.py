@@ -198,7 +198,7 @@ async def ingest_heartbeat(
     # Handle replay (idempotent - return 202 with replay=True)
     if result.replay:
         logger.info(
-            f"Heartbeat replay detected (idempotent)",
+            "Heartbeat replay detected (idempotent)",
             extra={"server_id": heartbeat.server_id, "heartbeat_id": heartbeat.heartbeat_id}
         )
         return HeartbeatResponse(
@@ -232,7 +232,7 @@ async def ingest_heartbeat(
         await jobs_repo.enqueue_server(heartbeat.server_id)
     except Exception as e:
         logger.error(
-            f"Failed to enqueue heartbeat job (non-fatal)",
+            "Failed to enqueue heartbeat job (non-fatal)",
             extra={"server_id": heartbeat.server_id, "error": str(e)}
         )
         # Non-fatal - heartbeat was persisted, worker can catch up

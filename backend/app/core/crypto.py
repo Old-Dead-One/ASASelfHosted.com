@@ -151,7 +151,7 @@ def verify_ed25519_signature(public_key_b64: str, message: bytes, signature_b64:
         
         return True
         
-    except (InvalidSignature, ValueError, base64.binascii.Error) as e:
+    except (InvalidSignature, ValueError, base64.binascii.Error):
         # Invalid signature, malformed base64, or wrong key format
         return False
     except Exception:

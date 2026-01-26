@@ -126,7 +126,7 @@ async def list_directory_servers(
     if limit > 100:
         raise DomainValidationError(f"limit must be <= 100, got {limit}")
     # Cursor pagination with search (q) not supported: seek uses or_(), search uses or_(); only one allowed.
-    if cursor and q and (q_trimmed := (q or "").strip()):
+    if cursor and q and (q or "").strip():
         raise DomainValidationError(
             "Cursor pagination is not supported when using search (q). Omit q to use cursor."
         )

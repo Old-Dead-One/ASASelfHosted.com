@@ -6,7 +6,7 @@ This allows frontend development without Supabase.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Sequence
+from typing import Any, Sequence
 
 from app.core.errors import DomainValidationError
 from app.db.directory_repo import DirectoryRepository

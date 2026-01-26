@@ -10,7 +10,7 @@ Comprehensive tests for directory endpoint contracts:
 All tests use fake repositories (hermetic, no Supabase dependency).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import pytest
 
@@ -20,11 +20,8 @@ from app.db.directory_repo import DirectoryRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
 from app.schemas.directory import (
-    ClusterVisibility,
-    DirectoryCluster,
     DirectoryServer,
     RankBy,
-    ServerStatus,
     SortOrder,
 )
 
@@ -413,8 +410,6 @@ class TestSecondsSinceSeen:
             # Mock servers have different last_seen_at times (some minutes ago, some hours ago)
             # This is expected - the test just verifies the field exists and is computed
             # The actual values depend on mock data's last_seen_at timestamps
-            min_val = min(seen_values)
-            max_val = max(seen_values)
             # Values can differ significantly if mock data has servers with very different last_seen_at
             # Just verify all values are non-negative
             assert all(v >= 0 for v in seen_values), \

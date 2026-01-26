@@ -6,8 +6,6 @@ Tests effective_status computation from heartbeat history.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from app.db.servers_derived_repo import Heartbeat
 from app.engines.status_engine import compute_effective_status
 

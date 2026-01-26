@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
