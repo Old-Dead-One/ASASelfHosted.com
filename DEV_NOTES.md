@@ -177,7 +177,6 @@ Always remind to commit after significant work to prevent data loss.
 ### Key Files
 - `DECISIONS.md` - **Official decisions (override any doc mismatches)**
 - `PROJECT_STRUCTURE.md` - Complete file/folder structure
-- `VERIFICATION.md` - Setup and verification checklist
 - `INSTALL.md` - Installation instructions
 - `README.md` - Project overview
 - `1_DESCRIPTION.txt` - Project description
