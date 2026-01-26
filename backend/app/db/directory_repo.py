@@ -29,7 +29,7 @@ from app.schemas.directory import (
 class DirectoryRepository(ABC):
     """
     Abstract repository for directory read operations.
-    
+
     Implementations:
     - MockDirectoryRepository: Mock data for Sprint 1
     - SupabaseDirectoryRepository: Real Supabase queries (Sprint 2+)
@@ -72,11 +72,12 @@ class DirectoryRepository(ABC):
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
-        now_utc: datetime | None = None,  # Request handling time for seconds_since_seen computation
+        now_utc: datetime
+        | None = None,  # Request handling time for seconds_since_seen computation
     ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
         List servers from directory view with cursor pagination.
-        
+
         Args:
             limit: Maximum number of items to return (default 25, max 100)
             cursor: Opaque cursor string for pagination (from previous response)
@@ -109,7 +110,7 @@ class DirectoryRepository(ABC):
             mods: Multi-select filter for mod names (OR semantics)
             platforms: Multi-select filter for platforms (OR semantics)
             now_utc: Request handling time for seconds_since_seen computation (must be consistent across response)
-            
+
         Returns:
             Tuple of (server list, next_cursor). next_cursor is None if no more results.
         """
@@ -119,7 +120,7 @@ class DirectoryRepository(ABC):
     async def get_facets(self) -> dict[str, list[str]]:
         """
         Get available filter facets from directory data.
-        
+
         Returns:
             Dictionary mapping facet names to lists of available values.
             Expected keys (may include additional keys):
@@ -130,7 +131,7 @@ class DirectoryRepository(ABC):
                 - "server_types": List of available server types (deprecated, may be removed)
                 - "game_modes": List of available game modes
                 - "statuses": List of available server statuses
-            
+
             Example: {
                 "maps": ["The Island", "Ragnarok"],
                 "mods": ["S+ Structures"],
@@ -146,7 +147,7 @@ class DirectoryRepository(ABC):
     async def get_filters(self) -> DirectoryFiltersResponse:
         """
         Get filter metadata for UI.
-        
+
         Returns:
             DirectoryFiltersResponse with available filter options, ranges, and defaults.
         """
@@ -156,10 +157,10 @@ class DirectoryRepository(ABC):
     async def get_server(self, server_id: str) -> DirectoryServer | None:
         """
         Get server by ID.
-        
+
         Args:
             server_id: Server UUID
-            
+
         Returns:
             DirectoryServer if found, None otherwise
         """

@@ -126,6 +126,7 @@ def rate_limit(
     Or as dependency:
         @router.post("/endpoint", dependencies=[Depends(rate_limit(60, 60))])
     """
+
     async def rate_limit_dependency(request: Request):
         if key_func:
             key = key_func(request)

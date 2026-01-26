@@ -23,10 +23,12 @@ def client():
     """Create test client with mock repositories."""
     # Override dependencies to use mock repos
     app.dependency_overrides[get_directory_repo] = lambda: MockDirectoryRepository()
-    app.dependency_overrides[get_directory_clusters_repo] = lambda: MockDirectoryClustersRepository()
-    
+    app.dependency_overrides[get_directory_clusters_repo] = (
+        lambda: MockDirectoryClustersRepository()
+    )
+
     yield TestClient(app)
-    
+
     # Clean up
     app.dependency_overrides.clear()
 
@@ -34,7 +36,7 @@ def client():
 def test_directory_servers_public(client: TestClient):
     """
     GET /api/v1/directory/servers returns 200 without token.
-    
+
     Directory endpoints are public - no auth required.
     """
     response = client.get("/api/v1/directory/servers")
@@ -49,13 +51,13 @@ def test_directory_servers_public(client: TestClient):
 def test_directory_server_public(client: TestClient):
     """
     GET /api/v1/directory/servers/{id} returns 200 or 404 without token.
-    
+
     Directory endpoints are public - no auth required.
     """
     # Test with valid mock server ID
     response = client.get("/api/v1/directory/servers/srv-001")
     assert response.status_code in (200, 404)  # 200 if found, 404 if not
-    
+
     # Test with invalid ID
     response = client.get("/api/v1/directory/servers/invalid-id")
     assert response.status_code == 404
@@ -64,7 +66,7 @@ def test_directory_server_public(client: TestClient):
 def test_protected_endpoint_without_auth(client: TestClient):
     """
     Protected endpoint returns 401 without token when bypass is off.
-    
+
     Note: This test assumes AUTH_BYPASS_LOCAL is False.
     If bypass is enabled, the endpoint will return 200 with fake user.
     """
@@ -73,7 +75,7 @@ def test_protected_endpoint_without_auth(client: TestClient):
         "/api/v1/servers",
         json={"name": "Test Server", "description": "Test"},
     )
-    
+
     # Should be 401 (unauthorized) or 422 (validation error if endpoint is stubbed)
     # If bypass is on, might be 200 or domain validation error
     assert response.status_code in (401, 422)

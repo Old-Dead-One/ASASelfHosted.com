@@ -52,16 +52,20 @@ def get_directory_repo() -> DirectoryRepository:
                     ) from e
                 # In local/dev/test, fall back to mock if Supabase init fails
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Supabase repository initialization failed, falling back to mock: {e}")
+                logger.warning(
+                    f"Supabase repository initialization failed, falling back to mock: {e}"
+                )
                 return _mock_repo
-        
+
         # If Supabase repo is configured, use it
         if _supabase_repo._configured:
             return _supabase_repo
         # If Supabase repo exists but isn't configured, fall back to mock in local/dev/test
         elif settings.ENV in ("local", "development", "test"):
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(
                 f"Supabase repository not configured ({_supabase_repo._config_error}), "
@@ -93,7 +97,7 @@ _servers_derived_repo: ServersDerivedRepository | None = None
 def get_heartbeat_repo() -> HeartbeatRepository:
     """
     Heartbeat repository provider.
-    
+
     Returns SupabaseHeartbeatRepository (requires service_role key).
     """
     global _heartbeat_repo
@@ -105,7 +109,7 @@ def get_heartbeat_repo() -> HeartbeatRepository:
 def get_heartbeat_jobs_repo() -> HeartbeatJobsRepository:
     """
     Heartbeat jobs repository provider.
-    
+
     Returns SupabaseHeartbeatJobsRepository (requires service_role key).
     """
     global _heartbeat_jobs_repo
@@ -117,7 +121,7 @@ def get_heartbeat_jobs_repo() -> HeartbeatJobsRepository:
 def get_servers_derived_repo() -> ServersDerivedRepository:
     """
     Servers derived state repository provider.
-    
+
     Returns SupabaseServersDerivedRepository (requires service_role key).
     """
     global _servers_derived_repo
@@ -129,12 +133,12 @@ def get_servers_derived_repo() -> ServersDerivedRepository:
 def get_directory_clusters_repo() -> DirectoryClustersRepository:
     """
     Directory clusters repository provider.
-    
+
     Returns SupabaseDirectoryClustersRepository (uses anon key for public access).
     Falls back behavior similar to get_directory_repo() if needed.
     """
     settings = get_settings()
-    
+
     # Try to use Supabase if credentials are configured
     if settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY:
         global _supabase_clusters_repo
@@ -149,15 +153,19 @@ def get_directory_clusters_repo() -> DirectoryClustersRepository:
                     ) from e
                 # In local/dev/test, allow failure but will raise on use
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Supabase clusters repository initialization failed: {e}")
-        
+                logger.warning(
+                    f"Supabase clusters repository initialization failed: {e}"
+                )
+
         # If Supabase repo is configured, use it
         if _supabase_clusters_repo and _supabase_clusters_repo._configured:
             return _supabase_clusters_repo
         # If Supabase repo exists but isn't configured, fall back to mock in local/dev/test
         elif settings.ENV in ("local", "development", "test"):
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(
                 f"Supabase clusters repository not configured ({_supabase_clusters_repo._config_error if _supabase_clusters_repo else 'not initialized'}), "
@@ -169,7 +177,7 @@ def get_directory_clusters_repo() -> DirectoryClustersRepository:
             raise RuntimeError(
                 f"Directory clusters repository not configured: {_supabase_clusters_repo._config_error if _supabase_clusters_repo else 'not initialized'}"
             )
-    
+
     # No Supabase credentials - use mock in local/dev/test, fail in staging/production
     if settings.ENV in ("local", "development", "test"):
         return _mock_clusters_repo

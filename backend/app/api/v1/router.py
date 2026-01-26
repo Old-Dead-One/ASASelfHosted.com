@@ -41,7 +41,7 @@ router.include_router(webhooks.router)
 async def api_v1_info():
     """
     API v1 information endpoint.
-    
+
     Returns API version, app version, and environment.
     """
     settings = get_settings()

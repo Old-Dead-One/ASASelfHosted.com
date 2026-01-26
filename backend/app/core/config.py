@@ -32,18 +32,26 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ORIGINS string into list."""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return [
+            origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()
+        ]
 
     # Supabase (optional for development scaffolding)
     # Default to None so tests don't accidentally try to connect
     SUPABASE_URL: str | None = None
     SUPABASE_ANON_KEY: str | None = None  # Public anon key (if needed for client-side)
-    SUPABASE_SERVICE_ROLE_KEY: str | None = None  # Service role key (backend only; use sparingly)
+    SUPABASE_SERVICE_ROLE_KEY: str | None = (
+        None  # Service role key (backend only; use sparingly)
+    )
 
     # JWT verification (JWKS-based, not secret-based)
     SUPABASE_JWT_ISSUER: str = ""  # https://<project-ref>.supabase.co/auth/v1
-    SUPABASE_JWKS_URL: str = ""  # https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
-    SUPABASE_JWT_AUDIENCE: str = "authenticated"  # Set "" to disable audience verification
+    SUPABASE_JWKS_URL: str = (
+        ""  # https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
+    )
+    SUPABASE_JWT_AUDIENCE: str = (
+        "authenticated"  # Set "" to disable audience verification
+    )
 
     # Auth bypass (local development only - explicit opt-in)
     AUTH_BYPASS_LOCAL: bool = False
@@ -73,7 +81,7 @@ class Settings(BaseSettings):
     HEARTBEAT_HISTORY_LIMIT: int = 500  # Max heartbeats to fetch per server
     HEARTBEAT_UPTIME_WINDOW_HOURS: int = 24  # Uptime calculation window
     RUN_HEARTBEAT_WORKER: bool = True
-    
+
     # Anomaly detection
     ANOMALY_DECAY_MINUTES: int = 30  # Clear anomaly flag after T minutes without spikes
 

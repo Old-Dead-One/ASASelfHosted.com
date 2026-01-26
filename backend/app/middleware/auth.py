@@ -29,11 +29,13 @@ async def auth_middleware(request: Request, call_next):
     request.state.user = None
 
     settings = get_settings()
-    
+
     # Local bypass: set fake user if enabled
     if settings.ENV == "local" and settings.AUTH_BYPASS_LOCAL:
         dev_user_id = request.headers.get("X-Dev-User", "").strip() or None
-        request.state.user = verify_supabase_jwt("bypass-token", dev_user_id=dev_user_id)
+        request.state.user = verify_supabase_jwt(
+            "bypass-token", dev_user_id=dev_user_id
+        )
         return await call_next(request)
 
     # Check for Authorization header

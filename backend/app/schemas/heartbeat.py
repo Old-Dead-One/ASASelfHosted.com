@@ -14,7 +14,7 @@ from app.schemas.base import BaseSchema
 class HeartbeatRequest(BaseSchema):
     """
     Schema for heartbeat ingestion from server agents.
-    
+
     Sprint 4 contract: Ed25519 signature verification, heartbeat_id for replay protection.
     Signature is the authentication mechanism (not user JWT).
     """
@@ -35,7 +35,7 @@ class HeartbeatRequest(BaseSchema):
 class HeartbeatResponse(BaseSchema):
     """
     Schema for heartbeat response.
-    
+
     Indicates whether heartbeat was received, processed, and if it was a replay.
     """
 

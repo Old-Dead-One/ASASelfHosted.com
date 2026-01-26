@@ -39,19 +39,32 @@ router = APIRouter(prefix="/directory", tags=["directory"])
 
 @router.get("/servers", response_model=DirectoryResponse)
 async def list_directory_servers(
-    limit: int = Query(default=25, ge=1, le=100, description="Maximum items to return (max 100)"),
-    cursor: str | None = Query(default=None, description="Opaque cursor for pagination (from previous response)"),
-    q: str | None = Query(default=None, description="Search query (searches name, description, map name, cluster name)"),
-    status: ServerStatus | None = Query(default=None, description="Filter by server status"),
+    limit: int = Query(
+        default=25, ge=1, le=100, description="Maximum items to return (max 100)"
+    ),
+    cursor: str | None = Query(
+        default=None,
+        description="Opaque cursor for pagination (from previous response)",
+    ),
+    q: str | None = Query(
+        default=None,
+        description="Search query (searches name, description, map name, cluster name)",
+    ),
+    status: ServerStatus | None = Query(
+        default=None, description="Filter by server status"
+    ),
     mode: VerificationMode | None = Query(
         default=None, description="Filter by verification mode (manual, verified)"
     ),
     rank_by: RankBy = Query(default="updated", description="Rank/sort servers by"),
     order: SortOrder = Query(default="desc", description="Sort order for rank_by"),
-    view: DirectoryView = Query(default="card", description="UI view hint (card/compact)"),
+    view: DirectoryView = Query(
+        default="card", description="UI view hint (card/compact)"
+    ),
     # Core server trait filters
     ruleset: Ruleset | None = Query(
-        default=None, description="Filter by ruleset (vanilla, vanilla_qol, boosted, modded)"
+        default=None,
+        description="Filter by ruleset (vanilla, vanilla_qol, boosted, modded)",
     ),
     game_mode: GameMode | None = Query(
         default=None, description="Filter by game mode (pve, pvp, pvpve)"
@@ -59,16 +72,21 @@ async def list_directory_servers(
     # TODO (Sprint 3+): Remove server_type filter - use ruleset instead
     # Note: If both ruleset and server_type are provided, ruleset takes precedence.
     server_type: ServerType | None = Query(
-        default=None, description="Filter by server type (vanilla, boosted) - Deprecated: use ruleset"
+        default=None,
+        description="Filter by server type (vanilla, boosted) - Deprecated: use ruleset",
     ),
-    map_name: str | None = Query(default=None, description="Filter by map name (string match)"),
+    map_name: str | None = Query(
+        default=None, description="Filter by map name (string match)"
+    ),
     cluster: str | None = Query(
         default=None, description="Filter by cluster slug or name (string match)"
     ),
     cluster_visibility: ClusterVisibility | None = Query(
         default=None, description="Filter by cluster visibility (public, unlisted)"
     ),
-    cluster_id: str | None = Query(default=None, description="Filter by specific cluster ID"),
+    cluster_id: str | None = Query(
+        default=None, description="Filter by specific cluster ID"
+    ),
     # Player filters
     # Canonical parameters (use these)
     players_current_min: int | None = Query(
@@ -97,17 +115,27 @@ async def list_directory_servers(
     ),
     modded: TriState = Query(
         default="any",
-        description="Filter servers that have mods installed (any/true/false). Note: This checks for installed mods, not ruleset classification. Use ruleset='modded' for gameplay classification."
+        description="Filter servers that have mods installed (any/true/false). Note: This checks for installed mods, not ruleset classification. Use ruleset='modded' for gameplay classification.",
     ),
     crossplay: TriState = Query(
         default="any", description="Filter crossplay support (any/true/false)"
     ),
-    console: TriState = Query(default="any", description="Filter console support (any/true/false)"),
-    pc: TriState = Query(default="any", description="Filter PC support (any/true/false)"),
+    console: TriState = Query(
+        default="any", description="Filter console support (any/true/false)"
+    ),
+    pc: TriState = Query(
+        default="any", description="Filter PC support (any/true/false)"
+    ),
     # Multi-select filters (OR semantics)
-    maps: list[str] | None = Query(default=None, description="Filter by map names (OR)"),
-    mods: list[str] | None = Query(default=None, description="Filter by mod names (OR)"),
-    platforms: list[Platform] | None = Query(default=None, description="Filter by platforms (OR)"),
+    maps: list[str] | None = Query(
+        default=None, description="Filter by map names (OR)"
+    ),
+    mods: list[str] | None = Query(
+        default=None, description="Filter by mod names (OR)"
+    ),
+    platforms: list[Platform] | None = Query(
+        default=None, description="Filter by platforms (OR)"
+    ),
     repo: DirectoryRepository = Depends(get_directory_repo),
     _user: UserIdentity | None = Depends(get_optional_user),
 ):
@@ -116,10 +144,10 @@ async def list_directory_servers(
 
     Public endpoint - no authentication required.
     Returns servers from directory_view (public read model).
-    
+
     Cursor pagination provides deterministic results under concurrent updates.
     Use `cursor` from previous response to get next page.
-    
+
     User context is available for personalized data (favorites, etc.) in future.
     """
     # Enforce max limit (400 error if > 100)
@@ -130,11 +158,15 @@ async def list_directory_servers(
         raise DomainValidationError(
             "Cursor pagination is not supported when using search (q). Omit q to use cursor."
         )
-    
+
     # Normalize players_min/max to players_current_min/max for repository
     # Use explicit None check (0 is valid and falsy)
-    effective_players_min = players_current_min if players_current_min is not None else players_min
-    effective_players_max = players_current_max if players_current_max is not None else players_max
+    effective_players_min = (
+        players_current_min if players_current_min is not None else players_min
+    )
+    effective_players_max = (
+        players_current_max if players_current_max is not None else players_max
+    )
 
     # Enforce precedence: if both ruleset and server_type are provided, ruleset takes precedence
     effective_server_type = None if ruleset else server_type
@@ -212,7 +244,7 @@ async def get_directory_filters(
 
     Returns available filter options, ranges, and defaults.
     Frontend uses this to populate filter dropdowns/toggles without hardcoding options.
-    
+
     Repository implementation determines availability:
     - MockDirectoryRepository: Returns mock data derived from available servers
     - SupabaseDirectoryRepository: Returns real data from Supabase (Sprint 2+)
@@ -225,12 +257,21 @@ async def get_directory_filters(
 
 @router.get("/clusters", response_model=DirectoryClustersResponse)
 async def list_directory_clusters(
-    limit: int = Query(default=25, ge=1, le=100, description="Maximum items to return (max 100)"),
-    cursor: str | None = Query(default=None, description="Opaque cursor for pagination (from previous response)"),
-    visibility: ClusterVisibility | None = Query(
-        default=None, description="Filter by visibility. Only 'public' is supported for public directory. Unlisted clusters are not accessible via public endpoints."
+    limit: int = Query(
+        default=25, ge=1, le=100, description="Maximum items to return (max 100)"
     ),
-    sort_by: str = Query(default="updated", description="Sort clusters by (updated or name). Note: server_count sorting not yet supported."),
+    cursor: str | None = Query(
+        default=None,
+        description="Opaque cursor for pagination (from previous response)",
+    ),
+    visibility: ClusterVisibility | None = Query(
+        default=None,
+        description="Filter by visibility. Only 'public' is supported for public directory. Unlisted clusters are not accessible via public endpoints.",
+    ),
+    sort_by: str = Query(
+        default="updated",
+        description="Sort clusters by (updated or name). Note: server_count sorting not yet supported.",
+    ),
     order: SortOrder = Query(default="desc", description="Sort order for sort_by"),
     repo: DirectoryClustersRepository = Depends(get_directory_clusters_repo),
     _user: UserIdentity | None = Depends(get_optional_user),
@@ -240,15 +281,15 @@ async def list_directory_clusters(
 
     Public endpoint - no authentication required.
     Returns clusters from clusters table.
-    
+
     Cursor pagination provides deterministic results under concurrent updates.
     Use `cursor` from previous response to get next page.
-    
+
     Visibility Rules:
         - If visibility is None: returns only public clusters (default)
         - If visibility is "public": returns only public clusters
         - If visibility is "unlisted": returns 400 Bad Request (unlisted clusters not accessible via public directory)
-        
+
     Note: Unlisted clusters are owner-only (RLS-enforced) and cannot be accessed via public directory endpoints.
     This endpoint only supports public clusters.
     """
@@ -262,8 +303,10 @@ async def list_directory_clusters(
         )
     # Validate sort_by
     if sort_by not in ("updated", "name"):
-        raise DomainValidationError(f"sort_by must be 'updated' or 'name', got {sort_by}")
-    
+        raise DomainValidationError(
+            f"sort_by must be 'updated' or 'name', got {sort_by}"
+        )
+
     # Get request handling time (consistent across all items in response)
     now_utc = datetime.now(timezone.utc)
 
@@ -296,18 +339,18 @@ async def get_directory_cluster(
     Get cluster details by ID from directory.
 
     Public endpoint - returns cluster if it's accessible.
-    
+
     Visibility Rules:
         - public: Returns cluster if found (readable by everyone)
         - unlisted: Returns 404 (unlisted clusters are not accessible via public directory endpoints)
         - private: Does not exist in DB enum, so not applicable
-        
+
     Note: This endpoint only supports public clusters. Unlisted clusters are owner-only (RLS-enforced)
     and cannot be accessed via public directory endpoints.
     """
     # Get request handling time
     now_utc = datetime.now(timezone.utc)
-    
+
     cluster = await repo.get_cluster(cluster_id, now_utc=now_utc)
     if not cluster:
         raise NotFoundError("cluster", cluster_id)
@@ -324,7 +367,7 @@ async def advanced_search(
 
     This endpoint is reserved for future advanced search with AND/OR/NOT logic.
     Returns 501 Not Implemented until Sprint 3+.
-    
+
     Hidden from OpenAPI schema until implemented to avoid advertising unsupported features.
     """
     from app.core.errors import NotImplementedError

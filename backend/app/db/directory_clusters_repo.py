@@ -15,7 +15,7 @@ from app.schemas.directory import ClusterVisibility, DirectoryCluster, SortOrder
 class DirectoryClustersRepository(ABC):
     """
     Abstract repository for cluster directory read operations.
-    
+
     Implementations:
     - MockDirectoryClustersRepository: Mock data for testing
     - SupabaseDirectoryClustersRepository: Real Supabase queries
@@ -33,7 +33,7 @@ class DirectoryClustersRepository(ABC):
     ) -> tuple[Sequence[DirectoryCluster], str | None]:
         """
         List clusters from directory with cursor pagination.
-        
+
         Args:
             limit: Maximum number of items to return (default 25, max 100)
             cursor: Opaque cursor string for pagination (from previous response)
@@ -41,10 +41,10 @@ class DirectoryClustersRepository(ABC):
             sort_by: Sort key ("updated" or "name")
             order: Sort order (asc/desc)
             now_utc: Request handling time for consistency (must be consistent across response)
-            
+
         Returns:
             Tuple of (cluster list, next_cursor). next_cursor is None if no more results.
-            
+
         Visibility Rules (public directory):
             - public-only exposure. Unlisted clusters are not accessible via directory endpoints.
             - list: returns only public clusters
@@ -60,11 +60,11 @@ class DirectoryClustersRepository(ABC):
     ) -> DirectoryCluster | None:
         """
         Get cluster by ID.
-        
+
         Args:
             cluster_id: Cluster UUID
             now_utc: Request handling time for consistency
-            
+
         Returns:
             DirectoryCluster if found and public, None otherwise.
             Unlisted clusters return None (public directory is public-only).

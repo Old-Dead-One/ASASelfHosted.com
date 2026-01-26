@@ -25,42 +25,42 @@ def compute_confidence(
     server_id: str,
     heartbeats: list[Heartbeat],
     grace_window_seconds: int,
-    agent_version: str | None = None
+    agent_version: str | None = None,
 ) -> Literal["green", "yellow", "red"]:
     """
     Compute RYG confidence (v1, simple, deterministic).
-    
+
     State Machine (downgrade only, no sudden jumps):
     - green: within grace + enough samples (≥3) → consistent signal
     - yellow: insufficient samples (<3) OR within 2*grace but beyond grace → intermittent/new
     - red: stale beyond 2*grace OR no heartbeats → stale/spoof attempts
-    
+
     Explicit Downgrade Rules (when confidence decreases):
     1. green → yellow: time_since_latest exceeds grace_window (but ≤ 2*grace)
     2. green → yellow: sample_count drops below 3 (holding time constant)
     3. yellow → red: time_since_latest exceeds 2*grace_window
     4. yellow → red: all heartbeats removed (sample_count → 0)
     5. green → red: time_since_latest exceeds 2*grace_window (skips yellow, but rare)
-    
+
     No Sudden Jumps:
     - Cannot go red → green directly (must pass through yellow first)
     - Requires: time_since_latest ≤ grace_window AND sample_count ≥ 3
     - This ensures sustained signal before green (prevents gaming)
-    
+
     Stability:
     - Deterministic: Same heartbeats + same grace_window → same output
     - Based on received_at (server-trusted clock), not agent timestamp
     - Tie-break: Most recent heartbeat wins (deterministic ordering)
-    
+
     Args:
         server_id: Server UUID (for logging/debugging)
         heartbeats: List of heartbeats ordered by received_at DESC (most recent first)
         grace_window_seconds: Grace window in seconds
         agent_version: Optional agent version string (not used in v1, reserved for future)
-        
+
     Returns:
         Confidence level: "green", "yellow", or "red" (never None)
-        
+
     Examples:
         - 5 heartbeats, latest within grace → "green"
         - 2 heartbeats, latest within grace → "yellow" (insufficient samples)
@@ -72,16 +72,16 @@ def compute_confidence(
         # No heartbeats → red (stale/never seen)
         # Downgrade rule: Any state → red if all heartbeats removed
         return "red"
-    
+
     # Get most recent heartbeat (deterministic: heartbeats ordered by received_at DESC)
     # Stability: Uses received_at (server-trusted clock), not agent timestamp
     latest_heartbeat = heartbeats[0]
     latest_received_at = latest_heartbeat["received_at"]
-    
+
     # Check time since latest heartbeat (based on received_at for stability)
     now = datetime.now(timezone.utc)
     time_since_latest = (now - latest_received_at).total_seconds()
-    
+
     # Red: stale beyond 2*grace (downgrade rule: any state → red if stale)
     # This is the most severe downgrade (stale signal)
     if time_since_latest > (2 * grace_window_seconds):
@@ -91,11 +91,11 @@ def compute_confidence(
             extra={
                 "server_id": server_id,
                 "time_since_latest": time_since_latest,
-                "grace_window": grace_window_seconds
-            }
+                "grace_window": grace_window_seconds,
+            },
         )
         return "red"
-    
+
     # Check sample count (need at least 3 heartbeats for green)
     # Downgrade rule: green → yellow if sample_count drops below 3
     sample_count = len(heartbeats)
@@ -105,10 +105,10 @@ def compute_confidence(
         reason = "insufficient_samples"
         logger.debug(
             f"Confidence: yellow ({reason})",
-            extra={"server_id": server_id, "sample_count": sample_count}
+            extra={"server_id": server_id, "sample_count": sample_count},
         )
         return "yellow"
-    
+
     # Check if within grace window
     if time_since_latest <= grace_window_seconds:
         # Within grace + enough samples (≥3) → green (consistent)
@@ -117,7 +117,7 @@ def compute_confidence(
         reason = "consistent"
         logger.debug(
             f"Confidence: green ({reason})",
-            extra={"server_id": server_id, "sample_count": sample_count}
+            extra={"server_id": server_id, "sample_count": sample_count},
         )
         return "green"
     else:
@@ -130,7 +130,7 @@ def compute_confidence(
             extra={
                 "server_id": server_id,
                 "time_since_latest": time_since_latest,
-                "grace_window": grace_window_seconds
-            }
+                "grace_window": grace_window_seconds,
+            },
         )
         return "yellow"

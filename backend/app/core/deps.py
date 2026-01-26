@@ -36,7 +36,7 @@ def _extract_bearer_token(request: Request) -> str | None:
 def _extract_dev_user_id(request: Request) -> str | None:
     """
     Extract dev user ID from X-Dev-User header (local bypass only).
-    
+
     Returns user ID string if present, None otherwise.
     Only used when AUTH_BYPASS_LOCAL is enabled.
     """
@@ -46,16 +46,16 @@ def _extract_dev_user_id(request: Request) -> str | None:
 async def _resolve_user(request: Request, required: bool) -> UserIdentity | None:
     """
     Internal resolver for user authentication.
-    
+
     DRY helper that handles both optional and required auth cases.
-    
+
     Args:
         request: FastAPI Request object
         required: If True, raises UnauthorizedError when auth fails
-        
+
     Returns:
         UserIdentity if authenticated, None if optional and not authenticated
-        
+
     Raises:
         UnauthorizedError if required=True and authentication fails
     """
@@ -119,7 +119,7 @@ get_current_user = require_user
 
 
 # Usage in FastAPI endpoints:
-# 
+#
 # For optional auth:
 #   user: UserIdentity | None = Depends(get_optional_user)
 #

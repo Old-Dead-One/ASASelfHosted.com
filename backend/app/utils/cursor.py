@@ -20,7 +20,7 @@ class Cursor:
     def __init__(self, sort_by: str, order: SortOrder, last_value: Any, last_id: str):
         """
         Create a cursor.
-        
+
         Args:
             sort_by: Sort key (rank_by value)
             order: Sort order (asc/desc)
@@ -42,13 +42,17 @@ class Cursor:
         }
         json_str = json.dumps(payload, sort_keys=True)
         # Use URL-safe base64 encoding (no + or / characters, safe for URLs without encoding)
-        return base64.urlsafe_b64encode(json_str.encode("utf-8")).decode("utf-8").rstrip("=")
+        return (
+            base64.urlsafe_b64encode(json_str.encode("utf-8"))
+            .decode("utf-8")
+            .rstrip("=")
+        )
 
     @staticmethod
     def decode(cursor_str: str) -> "Cursor":
         """
         Decode cursor from opaque string.
-        
+
         Raises:
             DomainValidationError: If cursor is invalid
         """
@@ -58,25 +62,36 @@ class Cursor:
             # Fix: Use (-len(s)) % 4 to correctly calculate padding (handles len % 4 == 0 case)
             pad_len = (-len(cursor_str)) % 4
             cursor_str_padded = cursor_str + ("=" * pad_len)
-            json_str = base64.urlsafe_b64decode(cursor_str_padded.encode("utf-8")).decode("utf-8")
+            json_str = base64.urlsafe_b64decode(
+                cursor_str_padded.encode("utf-8")
+            ).decode("utf-8")
             payload = json.loads(json_str)
-            
+
             # Validate required fields
-            if not all(k in payload for k in ("sort_by", "order", "last_value", "last_id")):
+            if not all(
+                k in payload for k in ("sort_by", "order", "last_value", "last_id")
+            ):
                 raise DomainValidationError("Invalid cursor: missing required fields")
-            
+
             # Validate order is asc or desc
             order = payload["order"]
             if order not in ("asc", "desc"):
-                raise DomainValidationError(f"Invalid cursor: order must be 'asc' or 'desc', got '{order}'")
-            
+                raise DomainValidationError(
+                    f"Invalid cursor: order must be 'asc' or 'desc', got '{order}'"
+                )
+
             return Cursor(
                 sort_by=payload["sort_by"],
                 order=order,
                 last_value=Cursor._deserialize_value(payload["last_value"]),
                 last_id=payload["last_id"],
             )
-        except (ValueError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as e:
+        except (
+            ValueError,
+            binascii.Error,
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+        ) as e:
             raise DomainValidationError(f"Invalid cursor format: {str(e)}") from e
 
     @staticmethod
@@ -97,7 +112,7 @@ class Cursor:
         # Handle datetime objects
         if isinstance(value, dict) and value.get("__type") == "datetime":
             from datetime import datetime, timezone
-            
+
             dt = datetime.fromisoformat(value["value"])
             # Ensure timezone-aware (assume UTC if not specified)
             if dt.tzinfo is None:
@@ -112,7 +127,7 @@ class Cursor:
     def validate_match(self, sort_by: str, order: SortOrder) -> None:
         """
         Validate cursor matches request parameters.
-        
+
         Raises:
             DomainValidationError: If cursor doesn't match request
         """
@@ -137,10 +152,10 @@ def create_cursor(
 def parse_cursor(cursor_str: str | None) -> Cursor | None:
     """
     Parse cursor string.
-    
+
     Returns:
         Cursor object if cursor_str is provided, None otherwise
-        
+
     Raises:
         DomainValidationError: If cursor is invalid
     """

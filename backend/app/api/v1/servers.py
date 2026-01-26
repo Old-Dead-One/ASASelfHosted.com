@@ -34,8 +34,12 @@ router = APIRouter(prefix="/servers", tags=["servers"])
 @router.get("/", response_model=DirectoryResponse)
 async def list_servers(
     page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(default=50, ge=1, le=100, description="Items per page (max 100)"),
-    q: str | None = Query(default=None, description="Search query (server name, description)"),
+    page_size: int = Query(
+        default=50, ge=1, le=100, description="Items per page (max 100)"
+    ),
+    q: str | None = Query(
+        default=None, description="Search query (server name, description)"
+    ),
     status: Literal["online", "offline", "unknown"] | None = Query(
         default=None, description="Filter by server status"
     ),
@@ -49,7 +53,7 @@ async def list_servers(
 
     Public endpoint - no authentication required.
     Returns servers from directory_view (public read model).
-    
+
     Pagination and filtering are supported.
     Search, status, and verification mode filters are optional.
     """

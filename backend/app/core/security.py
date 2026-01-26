@@ -29,12 +29,17 @@ class UserIdentity:
 
     Contains only essential auth information.
     Profile data should be fetched from DB with RLS if needed.
-    
+
     Note: user_id is effectively the 'sub' claim from JWT.
     This is the single consistent backend auth contract.
     """
 
-    def __init__(self, user_id: str, email: str | None = None, claims: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        user_id: str,
+        email: str | None = None,
+        claims: dict[str, Any] | None = None,
+    ):
         self.user_id = user_id  # This is the 'sub' claim from JWT
         self.email = email
         self.claims = claims or {}
@@ -44,7 +49,7 @@ class UserIdentity:
     def sub(self) -> str:
         """
         Convenience property: sub is the same as user_id.
-        
+
         JWT 'sub' claim maps to user_id in our model.
         """
         return self.user_id
@@ -53,11 +58,11 @@ class UserIdentity:
 def _create_local_dev_user(dev_user_id: str | None = None) -> UserIdentity:
     """
     Create a stable fake user for local development bypass mode.
-    
+
     Args:
         dev_user_id: Optional custom user ID (from X-Dev-User header)
                     Will be prefixed with "dev:" to make it obviously synthetic.
-    
+
     Returns:
         UserIdentity with stable fake user data
     """
@@ -67,7 +72,7 @@ def _create_local_dev_user(dev_user_id: str | None = None) -> UserIdentity:
         user_id = f"dev:{dev_user_id}"
     else:
         user_id = "dev:local-dev"
-    
+
     return UserIdentity(
         user_id=user_id,
         email=f"{user_id}@local.dev",
@@ -82,38 +87,40 @@ def _create_local_dev_user(dev_user_id: str | None = None) -> UserIdentity:
 def create_local_bypass_user(dev_user_id: str | None = None) -> UserIdentity:
     """
     Create a local bypass user (explicit helper for bypass mode).
-    
+
     This should only be called when AUTH_BYPASS_LOCAL is enabled.
     Use this instead of calling verify_supabase_jwt() with a fake token.
-    
+
     Args:
         dev_user_id: Optional custom user ID (from X-Dev-User header)
-    
+
     Returns:
         UserIdentity with stable fake user data
-        
+
     Raises:
         UnauthorizedError if bypass is not enabled
     """
     settings = get_settings()
     if settings.ENV != "local" or not settings.AUTH_BYPASS_LOCAL:
-        raise UnauthorizedError("Local bypass user is only available in local bypass mode")
+        raise UnauthorizedError(
+            "Local bypass user is only available in local bypass mode"
+        )
     return _create_local_dev_user(dev_user_id)
 
 
 def _fetch_jwks(jwks_url: str) -> dict:
     """
     Fetch JWKS from Supabase endpoint.
-    
+
     Args:
         jwks_url: JWKS endpoint URL
-        
+
     Returns:
         JWKS dictionary with keys
-        
+
     Raises:
         UnauthorizedError if fetch fails or response is invalid
-        
+
     Note: Currently synchronous (httpx.get). Under load, this blocks the event loop
     when JWKS cache expires. Consider migrating to httpx.AsyncClient in Sprint 2.
     """
@@ -121,11 +128,11 @@ def _fetch_jwks(jwks_url: str) -> dict:
         response = httpx.get(jwks_url, timeout=10.0)
         response.raise_for_status()
         jwks = response.json()
-        
+
         # Validate JWKS response shape
         if not isinstance(jwks, dict) or "keys" not in jwks:
             raise UnauthorizedError("Invalid JWKS response format")
-        
+
         return jwks
     except httpx.RequestError as e:
         raise UnauthorizedError(f"Failed to fetch JWKS: {str(e)}")
@@ -138,24 +145,24 @@ def _fetch_jwks(jwks_url: str) -> dict:
 def _get_jwks_keys(jwks_url: str) -> dict:
     """
     Get JWKS keys with caching and stale-if-error fallback.
-    
+
     Args:
         jwks_url: JWKS endpoint URL
-        
+
     Returns:
         JWKS dictionary with keys
-        
+
     Uses stale-if-error: if refresh fails but cached keys exist, return stale cache.
     This keeps auth working during JWKS endpoint hiccups.
     """
     now = time.time()
-    
+
     # Check cache
     if jwks_url in _jwks_cache:
         keys, cached_at = _jwks_cache[jwks_url]
         if now - cached_at < _jwks_cache_ttl:
             return keys
-        
+
         # TTL expired: try refresh, but fall back to stale cache on failure
         try:
             keys = _fetch_jwks(jwks_url)
@@ -164,7 +171,7 @@ def _get_jwks_keys(jwks_url: str) -> dict:
         except UnauthorizedError:
             # Return stale cache if refresh fails (keeps API alive during JWKS blips)
             return keys
-    
+
     # No cache: fetch and cache
     keys = _fetch_jwks(jwks_url)
     _jwks_cache[jwks_url] = (keys, now)
@@ -174,21 +181,21 @@ def _get_jwks_keys(jwks_url: str) -> dict:
 def _get_public_key_from_jwks(jwks: dict, kid: str) -> Any:
     """
     Get public key from JWKS by key ID.
-    
+
     Args:
         jwks: JWKS dictionary
         kid: Key ID from JWT header
-        
+
     Returns:
         Public key for verification
-        
+
     Raises:
         UnauthorizedError if key not found
     """
     for key in jwks.get("keys", []):
         if key.get("kid") == kid:
             return RSAAlgorithm.from_jwk(key)
-    
+
     raise UnauthorizedError(f"JWK with kid '{kid}' not found in JWKS")
 
 
@@ -212,7 +219,7 @@ def verify_supabase_jwt(token: str) -> UserIdentity:
     Note: Local bypass should use create_local_bypass_user() instead.
     """
     settings = get_settings()
-    
+
     if not token:
         raise UnauthorizedError("Missing bearer token")
 
@@ -220,7 +227,9 @@ def verify_supabase_jwt(token: str) -> UserIdentity:
     # In local mode without bypass, fail gracefully if JWKS not configured
     if not settings.SUPABASE_JWKS_URL:
         if settings.ENV == "local":
-            raise UnauthorizedError("JWKS URL not configured (set SUPABASE_JWKS_URL or enable AUTH_BYPASS_LOCAL)")
+            raise UnauthorizedError(
+                "JWKS URL not configured (set SUPABASE_JWKS_URL or enable AUTH_BYPASS_LOCAL)"
+            )
         raise UnauthorizedError("JWKS URL not configured")
 
     try:
@@ -285,4 +294,3 @@ def get_user_from_request(request: "Request") -> UserIdentity | None:
         UserIdentity if available, None if no user is attached (public request).
     """
     return getattr(request.state, "user", None)
-

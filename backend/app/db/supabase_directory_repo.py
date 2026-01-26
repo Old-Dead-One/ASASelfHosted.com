@@ -34,7 +34,7 @@ from app.utils.cursor import Cursor, create_cursor, parse_cursor
 class SupabaseDirectoryRepository(DirectoryRepository):
     """
     Supabase-based directory repository.
-    
+
     Queries from directory_view (read-only, public-safe).
     Fails fast if Supabase is not configured.
     """
@@ -43,7 +43,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
     def _normalize_array_field(value: str | list | None) -> list:
         """
         Normalize Postgres array fields to Python lists.
-        
+
         Handles cases where Supabase/PostgREST returns arrays as:
         - JSON arrays (list): return as-is
         - Postgres array strings ("{value1,value2}"): parse to list
@@ -51,10 +51,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         """
         if value is None:
             return []
-        
+
         if isinstance(value, list):
             return value
-        
+
         if isinstance(value, str):
             # Handle Postgres array string format: "{value1,value2}"
             if value.startswith("{") and value.endswith("}"):
@@ -66,7 +66,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 return [v.strip().strip('"') for v in inner.split(",") if v.strip()]
             # If it's a plain string, wrap it in a list
             return [value] if value else []
-        
+
         # Fallback: try to convert to list
         return list(value) if value else []
 
@@ -87,10 +87,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
     def _map_rank_by_to_column(rank_by: RankBy) -> str:
         """
         Map rank_by parameter to database column name.
-        
+
         Args:
             rank_by: Sort key parameter
-            
+
         Returns:
             Database column name for sorting
         """
@@ -108,10 +108,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
     def _is_nullable_column(column: str) -> bool:
         """
         Check if a column can be NULL.
-        
+
         Args:
             column: Database column name
-            
+
         Returns:
             True if column can be NULL, False otherwise
         """
@@ -125,12 +125,12 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
     def __init__(self):
         settings = get_settings()
-        
+
         # Always initialize state explicitly
         self._supabase = None
         self._configured = False
         self._config_error: str | None = None
-        
+
         if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
             if settings.ENV not in ("local", "development", "test"):
                 raise RuntimeError(
@@ -191,7 +191,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
     ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
         List servers from Supabase directory_view with cursor pagination.
-        
+
         Returns:
             Tuple of (server list, next_cursor). next_cursor is None if no more results.
         """
@@ -243,12 +243,14 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         if q and (q_trimmed := q.strip()):
             # PostgREST OR syntax: or=(field1.ilike.*value*,field2.ilike.*value*)
             # Format: "field1.ilike.*value*,field2.ilike.*value*"
-            or_conditions = ",".join([
-                f"name.ilike.%{q_trimmed}%",
-                f"description.ilike.%{q_trimmed}%",
-                f"map_name.ilike.%{q_trimmed}%",
-                f"cluster_name.ilike.%{q_trimmed}%"
-            ])
+            or_conditions = ",".join(
+                [
+                    f"name.ilike.%{q_trimmed}%",
+                    f"description.ilike.%{q_trimmed}%",
+                    f"map_name.ilike.%{q_trimmed}%",
+                    f"cluster_name.ilike.%{q_trimmed}%",
+                ]
+            )
             query = query.or_(or_conditions)
 
         # Apply status filter
@@ -363,7 +365,9 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         if platforms:
             # Filter by platforms array (OR semantics)
-            platforms_clean = [str(p).strip().lower() for p in platforms if str(p).strip()]
+            platforms_clean = [
+                str(p).strip().lower() for p in platforms if str(p).strip()
+            ]
             if platforms_clean:
                 # Use array overlap operator (ov - overlaps)
                 # PostgREST: platforms.ov.{platform1,platform2} checks if arrays overlap
@@ -398,6 +402,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             response = query.execute()
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(
                 "Directory read error: failed to query directory_view",
@@ -409,7 +414,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     "order": order,
                     "limit": limit,
                 },
-                exc_info=True
+                exc_info=True,
             )
             raise RuntimeError(f"Failed to query directory_view: {str(e)}") from e
 
@@ -419,7 +424,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         has_next = len(data) > limit
         if has_next:
             data = data[:limit]  # Keep only limit items
-        
+
         # Convert to DirectoryServer objects
         servers: list[DirectoryServer] = []
         last_row = None
@@ -429,25 +434,27 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # DirectoryServer requires list, not Optional or string
                 row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
                 row["platforms"] = self._normalize_array_field(row.get("platforms"))
-                
+
                 # Compute seconds_since_seen
                 last_seen_at = row.get("last_seen_at")
                 seconds_since_seen = None
                 if last_seen_at:
                     # Parse last_seen_at if it's a string
                     if isinstance(last_seen_at, str):
-                        last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+                        last_seen_dt = datetime.fromisoformat(
+                            last_seen_at.replace("Z", "+00:00")
+                        )
                     else:
                         last_seen_dt = last_seen_at
-                    
+
                     # Ensure timezone-aware
                     if last_seen_dt.tzinfo is None:
                         last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
-                    
+
                     # Compute seconds_since_seen = now_utc - last_seen_at
                     delta = (now_utc - last_seen_dt).total_seconds()
                     seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
-                
+
                 # Create DirectoryServer with rank fields and seconds_since_seen
                 server = DirectoryServer(
                     **row,
@@ -462,12 +469,12 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # Handle parse errors based on environment
                 import logging
                 from app.core.config import get_settings
-                
+
                 logger = logging.getLogger(__name__)
                 settings = get_settings()
-                
+
                 error_msg = f"Failed to parse server row: {e}"
-                
+
                 # In local/dev/test: log and skip (allows development with incomplete data)
                 # In non-local: fail fast (silently dropping rows is dangerous in production)
                 if settings.ENV in ("local", "development", "test"):
@@ -476,7 +483,9 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 else:
                     # Production: fail fast - silently dropping rows is dangerous
                     logger.error(error_msg)
-                    raise RuntimeError(f"Failed to parse server row from directory_view: {e}") from e
+                    raise RuntimeError(
+                        f"Failed to parse server row from directory_view: {e}"
+                    ) from e
 
         # Generate next_cursor if there are more results
         next_cursor = None
@@ -484,7 +493,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             # Get sort value and id from last row
             last_sort_value = last_row.get(sort_column)
             last_id = last_row.get("id")
-            
+
             if last_id:
                 next_cursor = create_cursor(rank_by, order, last_sort_value, last_id)
 
@@ -532,7 +541,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             # DirectoryServer requires list, not Optional or string
             row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
             row["platforms"] = self._normalize_array_field(row.get("platforms"))
-            
+
             # Compute seconds_since_seen (request handling time)
             now_utc = datetime.now(timezone.utc)
             last_seen_at = row.get("last_seen_at")
@@ -540,18 +549,20 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             if last_seen_at:
                 # Parse last_seen_at if it's a string
                 if isinstance(last_seen_at, str):
-                    last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+                    last_seen_dt = datetime.fromisoformat(
+                        last_seen_at.replace("Z", "+00:00")
+                    )
                 else:
                     last_seen_dt = last_seen_at
-                
+
                 # Ensure timezone-aware
                 if last_seen_dt.tzinfo is None:
                     last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
-                
+
                 # Compute seconds_since_seen = now_utc - last_seen_at
                 delta = (now_utc - last_seen_dt).total_seconds()
                 seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
-            
+
             # Set rank fields for consistency (rank_position=None for single fetch is fine)
             server = DirectoryServer(
                 **row,
@@ -563,10 +574,12 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         except Exception as e:
             from postgrest.exceptions import APIError as PostgrestAPIError
+
             if isinstance(e, PostgrestAPIError) and e.code == "22P02":
                 # Invalid UUID / invalid text representation → treat as not found
                 return None
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(
                 "Directory read error: failed to query directory_view for server",
@@ -576,14 +589,16 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     "read_operation": "get_server",
                     "server_id": server_id,
                 },
-                exc_info=True
+                exc_info=True,
             )
-            raise RuntimeError(f"Failed to query directory_view for server {server_id}: {str(e)}") from e
+            raise RuntimeError(
+                f"Failed to query directory_view for server {server_id}: {str(e)}"
+            ) from e
 
     async def get_filters(self) -> DirectoryFiltersResponse:
         """
         Get filter metadata for UI from Supabase.
-        
+
         Returns available filter options, ranges, and defaults from directory_view.
         """
         if not self._configured:
@@ -606,12 +621,18 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             # Get all servers to extract distinct values (with safety limit)
             all_servers_response = (
                 self._supabase.table("directory_view")
-                .select("ruleset,game_mode,effective_status,map_name,cluster_slug,cluster_name,players_current,uptime_percent,quality_score")
+                .select(
+                    "ruleset,game_mode,effective_status,map_name,cluster_slug,cluster_name,players_current,uptime_percent,quality_score"
+                )
                 .limit(LIMIT_SAFETY)
                 .execute()
             )
 
-            all_servers = all_servers_response.data if hasattr(all_servers_response, "data") else []
+            all_servers = (
+                all_servers_response.data
+                if hasattr(all_servers_response, "data")
+                else []
+            )
 
             # Extract distinct values
             rulesets_set: set[str] = set()
@@ -667,7 +688,14 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             }
 
             # Available rank_by options (from schema)
-            rank_by_options: list[RankBy] = ["updated", "new", "favorites", "players", "quality", "uptime"]
+            rank_by_options: list[RankBy] = [
+                "updated",
+                "new",
+                "favorites",
+                "players",
+                "quality",
+                "uptime",
+            ]
 
             return DirectoryFiltersResponse(
                 rank_by=rank_by_options,
@@ -682,6 +710,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(
                 "Directory read error: failed to query filter metadata",
@@ -690,14 +719,14 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     "error_type": type(e).__name__,
                     "read_operation": "get_filters",
                 },
-                exc_info=True
+                exc_info=True,
             )
             raise RuntimeError(f"Failed to query filter metadata: {str(e)}") from e
 
     async def get_facets(self) -> dict[str, list[str]]:
         """
         Get available filter facets from Supabase directory_view.
-        
+
         Returns distinct values for maps, mods, platforms, clusters.
         In Sprint 3, facets are "global distincts" (not filter-aware).
         """
@@ -725,7 +754,11 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 .execute()
             )
 
-            all_servers = all_servers_response.data if hasattr(all_servers_response, "data") else []
+            all_servers = (
+                all_servers_response.data
+                if hasattr(all_servers_response, "data")
+                else []
+            )
 
             # Extract distinct values
             maps_set: set[str] = set()
@@ -765,6 +798,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(
                 "Directory read error: failed to query facets",
@@ -773,6 +807,6 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     "error_type": type(e).__name__,
                     "read_operation": "get_facets",
                 },
-                exc_info=True
+                exc_info=True,
             )
             raise RuntimeError(f"Failed to query facets: {str(e)}") from e

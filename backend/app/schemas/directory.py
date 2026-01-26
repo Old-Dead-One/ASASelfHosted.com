@@ -44,7 +44,7 @@ class DirectoryServer(BaseSchema):
     The directory_view provides the persisted fields from the database.
     The backend adds computed rank fields (rank_position, rank_delta_24h, rank_by)
     and legacy field aliases (players_max, uptime_24h, rank, is_PC).
-    
+
     All directory endpoints should return this schema.
     Frontend TypeScript type must match this structure.
     """
@@ -79,7 +79,9 @@ class DirectoryServer(BaseSchema):
     #   - status_source="agent" + is_verified=True = Agent-detected status, listing is verified/curated
     #   - status_source="manual" + is_verified=False = Manually entered status, listing not verified
     last_seen_at: datetime | None = None
-    seconds_since_seen: float | None = None  # Seconds since last_seen_at (computed server-side, null if last_seen_at is null)
+    seconds_since_seen: float | None = (
+        None  # Seconds since last_seen_at (computed server-side, null if last_seen_at is null)
+    )
     confidence: Confidence | None = None  # RYG logic in Sprint 2
 
     # Timestamps
@@ -102,13 +104,17 @@ class DirectoryServer(BaseSchema):
     players_current: int | None = None
     players_capacity: int | None = None  # Maximum player capacity (canonical)
     # TODO (Sprint 3+): Remove players_max alias - use players_capacity only
-    players_max: int | None = None  # Deprecated alias (auto-populated from players_capacity)
+    players_max: int | None = (
+        None  # Deprecated alias (auto-populated from players_capacity)
+    )
 
     # Scoring (optional; real values arrive Sprint 2+)
     quality_score: float | None = None  # e.g. 0-100
     uptime_percent: float | None = None  # e.g. 0.0-100.0 (canonical field)
     # TODO (Sprint 3+): Remove uptime_24h alias - use uptime_percent only
-    uptime_24h: float | None = None  # Deprecated alias (auto-populated from uptime_percent)
+    uptime_24h: float | None = (
+        None  # Deprecated alias (auto-populated from uptime_percent)
+    )
 
     # Ranking (computed by backend for the chosen rank_by)
     # rank is global within the sorted dataset (not page-local)
@@ -136,7 +142,9 @@ class DirectoryServer(BaseSchema):
 
     # Platform and feature flags (computed in directory_view)
     platforms: list[Platform] = Field(default_factory=list)
-    is_official_plus: bool | None = None  # Official+ servers (enhanced official-like experience)
+    is_official_plus: bool | None = (
+        None  # Official+ servers (enhanced official-like experience)
+    )
     is_modded: bool | None = None  # Has mods (derived from mod_list)
     is_crossplay: bool | None = None  # Cross-platform support
     is_console: bool | None = None  # Console support
@@ -235,10 +243,10 @@ class DirectoryFiltersResponse(BaseSchema):
 class DirectoryCluster(BaseSchema):
     """
     Directory cluster response schema.
-    
+
     Minimal cluster information for public directory.
     """
-    
+
     id: str
     name: str
     slug: str
@@ -251,15 +259,15 @@ class DirectoryCluster(BaseSchema):
 class DirectoryClustersResponse(BaseSchema):
     """
     Directory clusters list response.
-    
+
     Wraps DirectoryCluster list with cursor pagination metadata.
     """
-    
+
     data: list[DirectoryCluster]
     limit: int
     cursor: str | None = None  # Opaque cursor for current page
     next_cursor: str | None = None  # Opaque cursor for next page (if more results)
-    
+
     # Optional echo for debugging / client UI
     sort_by: str | None = None
     order: SortOrder | None = None

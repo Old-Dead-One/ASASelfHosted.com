@@ -14,7 +14,7 @@ def test_compute_quality_score_no_uptime():
         players_current=None,
         players_capacity=None,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
     assert result is None
 
@@ -26,9 +26,9 @@ def test_compute_quality_score_high_uptime_green():
         players_current=50,
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     assert result is not None
     assert result > 80.0  # Should be high with good uptime and activity
 
@@ -40,17 +40,17 @@ def test_compute_quality_score_red_confidence_penalty():
         players_current=50,
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     result_red = compute_quality_score(
         uptime_percent=90.0,
         players_current=50,
         players_capacity=70,
         confidence="red",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     assert result_green is not None
     assert result_red is not None
     assert result_green > result_red  # Green should score higher than red
@@ -63,20 +63,22 @@ def test_compute_quality_score_player_activity():
         players_current=65,  # High fill rate
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     result_low_activity = compute_quality_score(
         uptime_percent=90.0,
         players_current=5,  # Low fill rate
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     assert result_high_activity is not None
     assert result_low_activity is not None
-    assert result_high_activity > result_low_activity  # High activity should score higher
+    assert (
+        result_high_activity > result_low_activity
+    )  # High activity should score higher
 
 
 def test_compute_quality_score_clamped_0_100():
@@ -87,9 +89,9 @@ def test_compute_quality_score_clamped_0_100():
         players_current=1000,  # Extreme
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     # Should still be clamped
     if result is not None:
         assert 0.0 <= result <= 100.0
@@ -102,17 +104,17 @@ def test_compute_quality_score_monotonic_uptime():
         players_current=50,
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     result_low = compute_quality_score(
         uptime_percent=50.0,  # Lower uptime
-        players_current=50,   # Same activity
+        players_current=50,  # Same activity
         players_capacity=70,
-        confidence="green",   # Same confidence
-        heartbeats=[]
+        confidence="green",  # Same confidence
+        heartbeats=[],
     )
-    
+
     assert result_high is not None
     assert result_low is not None
     assert result_high > result_low  # Higher uptime → higher quality
@@ -125,25 +127,25 @@ def test_compute_quality_score_monotonic_confidence():
         players_current=50,
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     result_yellow = compute_quality_score(
         uptime_percent=90.0,  # Same uptime
-        players_current=50,    # Same activity
+        players_current=50,  # Same activity
         players_capacity=70,
-        confidence="yellow",   # Lower confidence
-        heartbeats=[]
+        confidence="yellow",  # Lower confidence
+        heartbeats=[],
     )
-    
+
     result_red = compute_quality_score(
         uptime_percent=90.0,  # Same uptime
-        players_current=50,   # Same activity
+        players_current=50,  # Same activity
         players_capacity=70,
-        confidence="red",      # Lowest confidence
-        heartbeats=[]
+        confidence="red",  # Lowest confidence
+        heartbeats=[],
     )
-    
+
     assert result_green is not None
     assert result_yellow is not None
     assert result_red is not None
@@ -157,20 +159,22 @@ def test_compute_quality_score_monotonic_activity():
         players_current=65,  # High fill rate
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
-    
+
     result_low_activity = compute_quality_score(
         uptime_percent=90.0,  # Same uptime
-        players_current=5,    # Low fill rate
+        players_current=5,  # Low fill rate
         players_capacity=70,
-        confidence="green",    # Same confidence
-        heartbeats=[]
+        confidence="green",  # Same confidence
+        heartbeats=[],
     )
-    
+
     assert result_high_activity is not None
     assert result_low_activity is not None
-    assert result_high_activity > result_low_activity  # Higher activity → higher quality
+    assert (
+        result_high_activity > result_low_activity
+    )  # Higher activity → higher quality
 
 
 def test_compute_quality_score_unknown_behavior():
@@ -181,16 +185,16 @@ def test_compute_quality_score_unknown_behavior():
         players_current=50,
         players_capacity=70,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
     assert result1 is None
-    
+
     result2 = compute_quality_score(
         uptime_percent=None,
         players_current=None,
         players_capacity=None,
         confidence="green",
-        heartbeats=[]
+        heartbeats=[],
     )
     assert result2 is None
 
@@ -205,14 +209,14 @@ def test_compute_quality_score_bounded_outputs():
         (25.0, 10, 70, "red"),
         (75.0, 50, 70, "green"),
     ]
-    
+
     for uptime, players, capacity, confidence in test_cases:
         result = compute_quality_score(
             uptime_percent=uptime,
             players_current=players,
             players_capacity=capacity,
             confidence=confidence,
-            heartbeats=[]
+            heartbeats=[],
         )
         # Property: output is either None or in [0, 100]
         assert result is None or (0.0 <= result <= 100.0)

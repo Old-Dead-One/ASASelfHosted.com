@@ -451,7 +451,7 @@ MOCK_SERVERS: list[DirectoryServer] = [
 class MockDirectoryRepository(DirectoryRepository):
     """
     Mock directory repository for Sprint 1.
-    
+
     Returns mock data matching DirectoryServer schema.
     Allows frontend development without Supabase.
     """
@@ -491,24 +491,24 @@ class MockDirectoryRepository(DirectoryRepository):
     ) -> tuple[Sequence[DirectoryServer], str | None]:
         """
         List servers with cursor pagination.
-        
+
         Simple mock implementation - filters and paginates in memory.
         """
         # Enforce max limit (400 error if > 100)
         if limit > 100:
             raise DomainValidationError(f"limit must be <= 100, got {limit}")
-        
+
         # Parse and validate cursor
         parsed_cursor: Cursor | None = None
         if cursor:
             parsed_cursor = parse_cursor(cursor)
             # Validate cursor matches request parameters
             parsed_cursor.validate_match(rank_by, order)
-        
+
         # Get request handling time (consistent across response)
         if now_utc is None:
             now_utc = datetime.now(timezone.utc)
-        
+
         servers = list(MOCK_SERVERS)
 
         # Apply search filter (trim and validate query)
@@ -548,9 +548,7 @@ class MockDirectoryRepository(DirectoryRepository):
         if map_name:
             map_lower = map_name.strip().lower()
             servers = [
-                s
-                for s in servers
-                if s.map_name and map_lower in s.map_name.lower()
+                s for s in servers if s.map_name and map_lower in s.map_name.lower()
             ]
         if cluster:
             cluster_lower = cluster.strip().lower()
@@ -570,13 +568,15 @@ class MockDirectoryRepository(DirectoryRepository):
             servers = [
                 s
                 for s in servers
-                if s.players_current is not None and s.players_current >= players_current_min
+                if s.players_current is not None
+                and s.players_current >= players_current_min
             ]
         if players_current_max is not None:
             servers = [
                 s
                 for s in servers
-                if s.players_current is not None and s.players_current <= players_current_max
+                if s.players_current is not None
+                and s.players_current <= players_current_max
             ]
 
         # Apply numeric range filters
@@ -606,7 +606,8 @@ class MockDirectoryRepository(DirectoryRepository):
             servers = [
                 s
                 for s in servers
-                if s.is_official_plus is not None and s.is_official_plus == official_plus_val
+                if s.is_official_plus is not None
+                and s.is_official_plus == official_plus_val
             ]
 
         modded_val = _normalize_tristate(modded)
@@ -645,11 +646,7 @@ class MockDirectoryRepository(DirectoryRepository):
         pc_val = _normalize_tristate(pc)
         if pc_val is not None:
             # Tri-state: unknown (None) does not match true or false
-            servers = [
-                s
-                for s in servers
-                if s.is_pc is not None and s.is_pc == pc_val
-            ]
+            servers = [s for s in servers if s.is_pc is not None and s.is_pc == pc_val]
 
         # Apply multi-select filters (OR semantics)
         if maps:
@@ -662,9 +659,7 @@ class MockDirectoryRepository(DirectoryRepository):
             # Exact match on mod names (case-insensitive)
             mods_set = {m.lower() for m in mods}
             servers = [
-                s
-                for s in servers
-                if any(mod.lower() in mods_set for mod in s.mod_list)
+                s for s in servers if any(mod.lower() in mods_set for mod in s.mod_list)
             ]
 
         if platforms:
@@ -693,11 +688,11 @@ class MockDirectoryRepository(DirectoryRepository):
                 return s.uptime_percent
             else:
                 return s.updated_at
-        
+
         # Ranking/sorting with tie-break (id always ASC)
         # Handle NULL values: None sorts last (for both ASC and DESC)
         reverse = order == "desc"
-        
+
         def _sort_key(s: DirectoryServer) -> tuple:
             """Sort key that handles NULL values properly."""
             sort_value = _get_sort_value(s, rank_by)
@@ -706,21 +701,21 @@ class MockDirectoryRepository(DirectoryRepository):
             if sort_value is None:
                 # None values sort last regardless of order
                 # Use a tuple that will always be greater than any real value
-                return (float('inf') if reverse else float('-inf'), s.id)
+                return (float("inf") if reverse else float("-inf"), s.id)
             return (sort_value, s.id)
-        
+
         # Sort by sort key, then id (tie-break)
         servers.sort(key=_sort_key, reverse=reverse)
-        
+
         # Apply cursor seek predicate
         if parsed_cursor:
             cursor_last_value = parsed_cursor.last_value
             cursor_last_id = parsed_cursor.last_id
-            
+
             filtered_servers = []
             for s in servers:
                 sort_value = _get_sort_value(s, rank_by)
-                
+
                 # Skip items that match cursor exactly but should be excluded
                 if sort_value == cursor_last_value:
                     if order == "desc":
@@ -731,7 +726,7 @@ class MockDirectoryRepository(DirectoryRepository):
                         # For ASC: exclude if id <= last_id
                         if s.id <= cursor_last_id:
                             continue
-                
+
                 # For DESC: include if sort_value < last_value OR (sort_value = last_value AND id < last_id)
                 # For ASC: include if sort_value > last_value OR (sort_value = last_value AND id > last_id)
                 if order == "desc":
@@ -741,7 +736,9 @@ class MockDirectoryRepository(DirectoryRepository):
                             filtered_servers.append(s)
                         elif sort_value is None:
                             continue  # Skip NULLs
-                    elif sort_value < cursor_last_value or (sort_value == cursor_last_value and s.id < cursor_last_id):
+                    elif sort_value < cursor_last_value or (
+                        sort_value == cursor_last_value and s.id < cursor_last_id
+                    ):
                         filtered_servers.append(s)
                 else:
                     if sort_value is None or cursor_last_value is None:
@@ -750,14 +747,16 @@ class MockDirectoryRepository(DirectoryRepository):
                             filtered_servers.append(s)
                         elif sort_value is None:
                             continue  # Skip NULLs
-                    elif sort_value > cursor_last_value or (sort_value == cursor_last_value and s.id > cursor_last_id):
+                    elif sort_value > cursor_last_value or (
+                        sort_value == cursor_last_value and s.id > cursor_last_id
+                    ):
                         filtered_servers.append(s)
-            
+
             servers = filtered_servers
 
         # Take limit + 1 to detect if there's a next page
         has_next = len(servers) > limit
-        paginated_servers = servers[:limit + 1] if has_next else servers
+        paginated_servers = servers[: limit + 1] if has_next else servers
 
         # Convert to DirectoryServer with seconds_since_seen
         results: list[DirectoryServer] = []
@@ -770,18 +769,18 @@ class MockDirectoryRepository(DirectoryRepository):
                 last_seen_dt = s.last_seen_at
                 if last_seen_dt.tzinfo is None:
                     last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
-                
+
                 # Compute seconds_since_seen = now_utc - last_seen_at
                 delta = (now_utc - last_seen_dt).total_seconds()
                 seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
-            
+
             # Use canonical uptime_percent if present
             uptime_percent = (
                 s.uptime_percent
                 if s.uptime_percent is not None
                 else (s.uptime_24h * 100.0 if s.uptime_24h is not None else None)
             )
-            
+
             # Pydantic BaseModel copy
             try:
                 s2 = s.model_copy(
@@ -813,7 +812,7 @@ class MockDirectoryRepository(DirectoryRepository):
     async def get_filters(self) -> DirectoryFiltersResponse:
         """
         Get filter metadata for UI.
-        
+
         Derives available filter options, ranges, and defaults from mock data.
         """
         # Extract distinct values from mock servers
@@ -822,11 +821,11 @@ class MockDirectoryRepository(DirectoryRepository):
         rulesets_set: set[str] = set()
         game_modes_set: set[str] = set()
         statuses_set: set[str] = set()
-        
+
         players_values: list[int] = []
         uptime_values: list[float] = []
         quality_values: list[float] = []
-        
+
         for server in MOCK_SERVERS:
             if server.map_name:
                 maps_set.add(server.map_name)
@@ -837,20 +836,24 @@ class MockDirectoryRepository(DirectoryRepository):
             if server.game_mode:
                 game_modes_set.add(server.game_mode)
             statuses_set.add(server.effective_status)
-            
+
             if server.players_current is not None:
                 players_values.append(server.players_current)
             if server.uptime_percent is not None:
                 uptime_values.append(server.uptime_percent)
             if server.quality_score is not None:
                 quality_values.append(server.quality_score)
-        
+
         # Build clusters list
-        clusters_list = [
-            ClusterInfo(slug=slug, name=name)
-            for slug, name in sorted(clusters_dict.items())
-        ] if clusters_dict else None
-        
+        clusters_list = (
+            [
+                ClusterInfo(slug=slug, name=name)
+                for slug, name in sorted(clusters_dict.items())
+            ]
+            if clusters_dict
+            else None
+        )
+
         # Calculate ranges
         ranges = {
             "players": NumericRange(
@@ -866,10 +869,17 @@ class MockDirectoryRepository(DirectoryRepository):
                 max=float(max(quality_values)) if quality_values else None,
             ),
         }
-        
+
         # Get rank_by options (hardcoded for mock metadata - matches RankBy Literal)
-        rank_by_options = ["updated", "new", "favorites", "players", "quality", "uptime"]
-        
+        rank_by_options = [
+            "updated",
+            "new",
+            "favorites",
+            "players",
+            "quality",
+            "uptime",
+        ]
+
         return DirectoryFiltersResponse(
             rank_by=rank_by_options,
             rulesets=sorted(list(rulesets_set)),
@@ -889,7 +899,7 @@ class MockDirectoryRepository(DirectoryRepository):
     async def get_facets(self) -> dict[str, list[str]]:
         """
         Get available filter facets from mock data.
-        
+
         Extracts distinct values for maps, mods, platforms, server types, game modes, and statuses.
         """
         facets: dict[str, set[str]] = {
@@ -929,7 +939,7 @@ class MockDirectoryRepository(DirectoryRepository):
         server = next((s for s in MOCK_SERVERS if s.id == server_id), None)
         if server is None:
             return None
-        
+
         # Compute seconds_since_seen (request handling time)
         now_utc = datetime.now(timezone.utc)
         seconds_since_seen = None
@@ -938,11 +948,11 @@ class MockDirectoryRepository(DirectoryRepository):
             last_seen_dt = server.last_seen_at
             if last_seen_dt.tzinfo is None:
                 last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
-            
+
             # Compute seconds_since_seen = now_utc - last_seen_at
             delta = (now_utc - last_seen_dt).total_seconds()
             seconds_since_seen = max(0.0, delta)  # Clamp negatives to 0
-        
+
         # Return server with seconds_since_seen
         try:
             return server.model_copy(update={"seconds_since_seen": seconds_since_seen})

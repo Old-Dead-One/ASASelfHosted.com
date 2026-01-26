@@ -21,7 +21,7 @@ from app.core.errors import setup_error_handlers
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for FastAPI app.
-    
+
     Handles startup and shutdown events.
     Replaces deprecated @app.on_event("startup") pattern.
     """
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     try:
         if settings.ENV != "test" and settings.RUN_HEARTBEAT_WORKER:
             from app.workers.heartbeat_worker import process_heartbeat_jobs
+
             asyncio.create_task(process_heartbeat_jobs())
             logger.info("Heartbeat worker started as background task")
         else:
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
         logger.exception("Failed to start heartbeat worker", extra={"error": str(e)})
 
     yield  # App runs here
-    
+
     # Shutdown (if needed in future)
     # Currently no cleanup needed, but this is where it would go
 
@@ -59,11 +60,15 @@ def create_app() -> FastAPI:
 
     # Startup config banner
     logger = logging.getLogger("asaselfhosted.startup")
-    
-    auth_mode = "BYPASS" if (settings.ENV == "local" and settings.AUTH_BYPASS_LOCAL) else "REAL"
+
+    auth_mode = (
+        "BYPASS" if (settings.ENV == "local" and settings.AUTH_BYPASS_LOCAL) else "REAL"
+    )
     cors_count = len(settings.cors_origins_list)
-    cors_list = ", ".join(settings.cors_origins_list[:3]) + ("..." if cors_count > 3 else "")
-    
+    cors_list = ", ".join(settings.cors_origins_list[:3]) + (
+        "..." if cors_count > 3 else ""
+    )
+
     logger.info("=" * 60)
     logger.info("ASASelfHosted.com API Starting")
     logger.info(f"ENV: {settings.ENV}")
@@ -107,7 +112,9 @@ def create_app() -> FastAPI:
 
     # Starlette rejects "*" with allow_credentials=True; keep it out of non-local environments
     if "*" in cors_origins and settings.ENV in ("staging", "production"):
-        raise ValueError("Cannot use '*' origin with allow_credentials=True in staging/production")
+        raise ValueError(
+            "Cannot use '*' origin with allow_credentials=True in staging/production"
+        )
 
     app.add_middleware(
         CORSMiddleware,

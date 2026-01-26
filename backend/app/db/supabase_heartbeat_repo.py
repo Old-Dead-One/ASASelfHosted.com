@@ -16,18 +16,18 @@ from app.schemas.heartbeat import HeartbeatRequest
 class SupabaseHeartbeatRepository(HeartbeatRepository):
     """
     Supabase-based heartbeat repository.
-    
+
     Inserts heartbeats append-only with replay detection.
     Uses service_role key (bypasses RLS for writes).
     """
 
     def __init__(self):
         settings = get_settings()
-        
+
         self._supabase = None
         self._configured = False
         self._config_error: str | None = None
-        
+
         if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
             if settings.ENV not in ("local", "development", "test"):
                 raise RuntimeError(
@@ -45,7 +45,9 @@ class SupabaseHeartbeatRepository(HeartbeatRepository):
                     raise RuntimeError(
                         f"Failed to initialize Supabase admin client: {str(e)}"
                     ) from e
-                self._config_error = f"Supabase admin client initialization failed: {str(e)}"
+                self._config_error = (
+                    f"Supabase admin client initialization failed: {str(e)}"
+                )
 
     async def create_heartbeat(
         self,
@@ -55,11 +57,11 @@ class SupabaseHeartbeatRepository(HeartbeatRepository):
     ) -> HeartbeatCreateResult:
         """
         Insert heartbeat append-only with replay detection.
-        
+
         Replay detection via UNIQUE(server_id, heartbeat_id) constraint:
         - Same heartbeat_id, same server → idempotent (returns replay=True)
         - Same heartbeat_id, different server → rejected (DB constraint violation)
-        
+
         Normalizes players fields: canonical fields (players_current, players_capacity)
         are the source of truth. Legacy fields (player_count, max_players) are set
         for compatibility but should not be read by engines.
@@ -97,26 +99,32 @@ class SupabaseHeartbeatRepository(HeartbeatRepository):
 
         try:
             # Insert heartbeat (append-only)
-            response = self._supabase.table("heartbeats").insert(heartbeat_data).execute()
-            
+            response = (
+                self._supabase.table("heartbeats").insert(heartbeat_data).execute()
+            )
+
             # If insert succeeded, it's a new heartbeat
             if response.data:
                 return HeartbeatCreateResult(inserted=True, replay=False)
             else:
                 # No data returned (shouldn't happen, but handle gracefully)
                 return HeartbeatCreateResult(inserted=False, replay=False)
-                
+
         except Exception as e:
             error_str = str(e).lower()
-            
+
             # Check for unique constraint violation (replay)
             # UNIQUE(server_id, heartbeat_id) ensures:
             # - Same server_id + same heartbeat_id → replay (idempotent)
             # - Different server_id + same heartbeat_id → rejected (should never happen, but DB enforces)
-            if "unique" in error_str or "duplicate" in error_str or "uq_heartbeats_server_heartbeat_id" in error_str:
+            if (
+                "unique" in error_str
+                or "duplicate" in error_str
+                or "uq_heartbeats_server_heartbeat_id" in error_str
+            ):
                 # Replay detected - heartbeat_id already exists for this server
                 # This is idempotent: same heartbeat_id for same server is safe to ignore
                 return HeartbeatCreateResult(inserted=False, replay=True)
-            
+
             # Other error - re-raise
             raise RuntimeError(f"Failed to insert heartbeat: {str(e)}") from e

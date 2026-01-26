@@ -199,7 +199,11 @@ def setup_error_handlers(app: FastAPI) -> None:
         }
 
         # Add details for validation errors
-        if isinstance(exc, DomainValidationError) and hasattr(exc, "details") and exc.details:
+        if (
+            isinstance(exc, DomainValidationError)
+            and hasattr(exc, "details")
+            and exc.details
+        ):
             response_data["error"]["details"] = exc.details
 
         # Add request_id if available (for log correlation)
@@ -280,7 +284,9 @@ def setup_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def generic_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         """
         Catch-all for unexpected errors.
 
@@ -293,10 +299,12 @@ def setup_error_handlers(app: FastAPI) -> None:
             "path": request.url.path,
             "method": request.method,
         }
-        
+
         if settings.ENV == "local":
             # Keep it loud and obvious while developing
-            logger.exception("Unhandled exception (local)", extra=log_extra, exc_info=exc)
+            logger.exception(
+                "Unhandled exception (local)", extra=log_extra, exc_info=exc
+            )
         else:
             logger.exception("Unhandled exception", extra=log_extra, exc_info=exc)
 

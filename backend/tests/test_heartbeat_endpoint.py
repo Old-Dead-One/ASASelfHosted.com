@@ -25,13 +25,17 @@ class FakeHeartbeatRepo(HeartbeatRepository):
 
     async def create_heartbeat(self, req, received_at, server_cluster_id=None):
         self.calls.append((req, received_at, server_cluster_id))
-        heartbeat_id = req.heartbeat_id if hasattr(req, 'heartbeat_id') else req.get('heartbeat_id')
-        
+        heartbeat_id = (
+            req.heartbeat_id
+            if hasattr(req, "heartbeat_id")
+            else req.get("heartbeat_id")
+        )
+
         # Check if this is a replay
         is_replay = heartbeat_id in self.seen_heartbeat_ids
         if not is_replay:
             self.seen_heartbeat_ids.add(heartbeat_id)
-        
+
         # If replay mode is set, always return replay=True, otherwise use actual detection
         if self.replay:
             return HeartbeatCreateResult(inserted=False, replay=True)
@@ -75,7 +79,9 @@ class FakeDerivedRepo(ServersDerivedRepository):
     async def get_recent_heartbeats(self, server_id: str, limit: int):
         return []
 
-    async def update_derived_state(self, server_id: str, derived_state, derived_at: datetime):
+    async def update_derived_state(
+        self, server_id: str, derived_state, derived_at: datetime
+    ):
         return None
 
     async def fast_path_update_from_heartbeat(
@@ -86,9 +92,19 @@ class FakeDerivedRepo(ServersDerivedRepository):
         players_current,
         players_capacity,
     ) -> None:
-        self.fast_updates.append((server_id, received_at, heartbeat_timestamp, players_current, players_capacity))
+        self.fast_updates.append(
+            (
+                server_id,
+                received_at,
+                heartbeat_timestamp,
+                players_current,
+                players_capacity,
+            )
+        )
 
-    async def get_current_anomaly_state(self, server_id: str) -> tuple[bool | None, datetime | None]:
+    async def get_current_anomaly_state(
+        self, server_id: str
+    ) -> tuple[bool | None, datetime | None]:
         return False, None
 
 
@@ -129,11 +145,14 @@ def test_heartbeat_valid_signature_happy_path(client):
     }
     envelope["signature"] = sign_envelope(priv, envelope)
 
-    r = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        # serialize timestamp as ISO for request payload
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            # serialize timestamp as ISO for request payload
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r.status_code == 200 or r.status_code == 202
     body = r.json()
     assert body["received"] is True
@@ -169,10 +188,13 @@ def test_heartbeat_replay_is_idempotent_and_does_not_enqueue(client):
     }
     envelope["signature"] = sign_envelope(priv, envelope)
 
-    r = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r.status_code == 200 or r.status_code == 202
     body = r.json()
     assert body["replay"] is True
@@ -240,24 +262,30 @@ def test_heartbeat_duplicate_id_does_not_affect_ranking(client):
     envelope["signature"] = sign_envelope(priv, envelope)
 
     # First heartbeat (should succeed)
-    r1 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r1 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r1.status_code in (200, 202)
-    
+
     # Second heartbeat with same ID (replay)
-    r2 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r2 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r2.status_code in (200, 202)
     body2 = r2.json()
     assert body2["replay"] is True
 
     # Replay should not enqueue job (no duplicate processing)
     assert jobs_repo.enqueued == ["server-1"]  # Only first heartbeat enqueued
-    
+
     app.dependency_overrides.clear()
 
 
@@ -286,10 +314,13 @@ def test_heartbeat_replay_detection_works_correctly(client):
     }
     envelope["signature"] = sign_envelope(priv, envelope)
 
-    r1 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r1 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r1.status_code in (200, 202)
     body1 = r1.json()
     assert body1["replay"] is False
@@ -306,10 +337,13 @@ def test_heartbeat_replay_detection_works_correctly(client):
     app.dependency_overrides[get_heartbeat_jobs_repo] = lambda: jobs_repo2
     app.dependency_overrides[get_servers_derived_repo] = lambda: derived_repo2
 
-    r2 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r2 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r2.status_code in (200, 202)
     body2 = r2.json()
     assert body2["replay"] is True
@@ -343,24 +377,30 @@ def test_heartbeat_replay_does_not_create_duplicate_jobs(client):
     envelope["signature"] = sign_envelope(priv, envelope)
 
     # First call
-    r1 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r1 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r1.status_code in (200, 202)
     assert len(jobs_repo.enqueued) == 1
     assert jobs_repo.enqueued == ["server-1"]
 
     # Second call with same heartbeat_id (replay)
     hb_repo.replay = True  # Simulate replay detection
-    r2 = client.post("/api/v1/heartbeat/", json={
-        **envelope,
-        "timestamp": now.isoformat().replace("+00:00", "Z"),
-    })
+    r2 = client.post(
+        "/api/v1/heartbeat/",
+        json={
+            **envelope,
+            "timestamp": now.isoformat().replace("+00:00", "Z"),
+        },
+    )
     assert r2.status_code in (200, 202)
     body2 = r2.json()
     assert body2["replay"] is True
-    
+
     # Should still have only one job (no duplicate)
     assert len(jobs_repo.enqueued) == 1
     assert jobs_repo.enqueued == ["server-1"]

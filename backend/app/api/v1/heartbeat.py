@@ -48,7 +48,7 @@ async def ingest_heartbeat(
     Ingest signed heartbeat from server agent.
 
     Sprint 4: Ed25519 signature verification, replay protection via heartbeat_id.
-    
+
     Synchronous flow (fast path):
     1. Rate limit check
     2. Load server and cluster by server_id
@@ -66,9 +66,11 @@ async def ingest_heartbeat(
     """
     # 1. Rate limit check (12 requests per minute per server)
     heartbeat_rate_limit(request, heartbeat.server_id)
-    
+
     # 2. Load server and cluster by server_id
-    server_cluster = await derived_repo.get_server_cluster_and_grace(heartbeat.server_id)
+    server_cluster = await derived_repo.get_server_cluster_and_grace(
+        heartbeat.server_id
+    )
     if not server_cluster:
         logger.warning(
             "Heartbeat rejected: server not found",
@@ -76,7 +78,7 @@ async def ingest_heartbeat(
                 "server_id": heartbeat.server_id,
                 "rejection_reason": "server_not_found",
                 "heartbeat_id": heartbeat.heartbeat_id,
-            }
+            },
         )
         raise NotFoundError("server", heartbeat.server_id)
 
@@ -89,9 +91,11 @@ async def ingest_heartbeat(
                 "cluster_id": server_cluster.get("cluster_id"),
                 "rejection_reason": "cluster_missing_public_key",
                 "heartbeat_id": heartbeat.heartbeat_id,
-            }
+            },
         )
-        raise UnauthorizedError("Cluster missing public_key_ed25519 for signature verification")
+        raise UnauthorizedError(
+            "Cluster missing public_key_ed25519 for signature verification"
+        )
 
     cluster_key_version = server_cluster.get("key_version", 1)
     if heartbeat.key_version != cluster_key_version:
@@ -102,7 +106,7 @@ async def ingest_heartbeat(
 
     cluster_grace_seconds = server_cluster.get("heartbeat_grace_seconds")
     grace_window = get_grace_window_seconds(cluster_grace_seconds)
-    
+
     # 3. Verify signature (Ed25519)
     # Canonicalize envelope (exclude signature, payload)
     envelope = {
@@ -117,13 +121,11 @@ async def ingest_heartbeat(
         "agent_version": heartbeat.agent_version,
     }
     canonical_message = canonicalize_heartbeat_envelope(envelope)
-    
+
     signature_valid = verify_ed25519_signature(
-        public_key_ed25519,
-        canonical_message,
-        heartbeat.signature
+        public_key_ed25519, canonical_message, heartbeat.signature
     )
-    
+
     if not signature_valid:
         logger.warning(
             "Heartbeat rejected: invalid signature",
@@ -133,21 +135,21 @@ async def ingest_heartbeat(
                 "rejection_reason": "invalid_signature",
                 "heartbeat_id": heartbeat.heartbeat_id,
                 "key_version": heartbeat.key_version,
-            }
+            },
         )
         raise SignatureVerificationError("Invalid Ed25519 signature")
-    
+
     # 4. Timestamp validation
     now = datetime.now(timezone.utc)
-    
+
     # Ensure heartbeat.timestamp is timezone-aware
     if heartbeat.timestamp.tzinfo is None:
         heartbeat_timestamp = heartbeat.timestamp.replace(tzinfo=timezone.utc)
     else:
         heartbeat_timestamp = heartbeat.timestamp
-    
+
     time_delta = (now - heartbeat_timestamp).total_seconds()
-    
+
     # Reject if stale beyond grace window
     if time_delta > grace_window:
         logger.warning(
@@ -156,16 +158,18 @@ async def ingest_heartbeat(
                 "server_id": heartbeat.server_id,
                 "rejection_reason": "timestamp_stale",
                 "heartbeat_id": heartbeat.heartbeat_id,
-                "timestamp": heartbeat.timestamp.isoformat() if heartbeat.timestamp else None,
+                "timestamp": heartbeat.timestamp.isoformat()
+                if heartbeat.timestamp
+                else None,
                 "grace_window_seconds": grace_window,
                 "time_since_timestamp": time_delta,
-            }
+            },
         )
         raise HTTPException(
             status_code=400,
-            detail=f"Heartbeat timestamp is stale (delta: {time_delta:.0f}s, grace: {grace_window}s)"
+            detail=f"Heartbeat timestamp is stale (delta: {time_delta:.0f}s, grace: {grace_window}s)",
         )
-    
+
     # Reject if > 60s in future (clock skew violation)
     if time_delta < -60:
         logger.warning(
@@ -174,40 +178,40 @@ async def ingest_heartbeat(
                 "server_id": heartbeat.server_id,
                 "rejection_reason": "clock_skew_violation",
                 "heartbeat_id": heartbeat.heartbeat_id,
-                "timestamp": heartbeat.timestamp.isoformat() if heartbeat.timestamp else None,
+                "timestamp": heartbeat.timestamp.isoformat()
+                if heartbeat.timestamp
+                else None,
                 "time_ahead": abs(time_delta),
                 "delta_seconds": time_delta,
                 "agent_timestamp": heartbeat_timestamp.isoformat(),
                 "server_timestamp": now.isoformat(),
                 "agent_version": heartbeat.agent_version,
-            }
+            },
         )
         raise HTTPException(
             status_code=400,
-            detail=f"Heartbeat timestamp is too far in future (clock skew: {time_delta:.0f}s). Agent clock may be incorrect."
+            detail=f"Heartbeat timestamp is too far in future (clock skew: {time_delta:.0f}s). Agent clock may be incorrect.",
         )
-    
+
     # 5. Insert heartbeat (append-only)
     received_at = now
     result = await heartbeat_repo.create_heartbeat(
-        heartbeat,
-        received_at,
-        server_cluster_id=server_cluster.get("cluster_id")
+        heartbeat, received_at, server_cluster_id=server_cluster.get("cluster_id")
     )
-    
+
     # Handle replay (idempotent - return 202 with replay=True)
     if result.replay:
         logger.info(
             "Heartbeat replay detected (idempotent)",
-            extra={"server_id": heartbeat.server_id, "heartbeat_id": heartbeat.heartbeat_id}
+            extra={
+                "server_id": heartbeat.server_id,
+                "heartbeat_id": heartbeat.heartbeat_id,
+            },
         )
         return HeartbeatResponse(
-            received=True,
-            server_id=heartbeat.server_id,
-            processed=True,
-            replay=True
+            received=True, server_id=heartbeat.server_id, processed=True, replay=True
         )
-    
+
     # 6. Fast path server update
     try:
         await derived_repo.fast_path_update_from_heartbeat(
@@ -218,7 +222,10 @@ async def ingest_heartbeat(
             players_capacity=heartbeat.players_capacity,
         )
         processed = True
-        logger.debug("Heartbeat fast-path update succeeded", extra={"server_id": heartbeat.server_id})
+        logger.debug(
+            "Heartbeat fast-path update succeeded",
+            extra={"server_id": heartbeat.server_id},
+        )
     except Exception as e:
         processed = False
         logger.warning(
@@ -226,21 +233,18 @@ async def ingest_heartbeat(
             extra={"server_id": heartbeat.server_id, "error": str(e)},
         )
         # Non-fatal - worker will update later
-    
+
     # 7. Enqueue server_id for worker (durable queue)
     try:
         await jobs_repo.enqueue_server(heartbeat.server_id)
     except Exception as e:
         logger.error(
             "Failed to enqueue heartbeat job (non-fatal)",
-            extra={"server_id": heartbeat.server_id, "error": str(e)}
+            extra={"server_id": heartbeat.server_id, "error": str(e)},
         )
         # Non-fatal - heartbeat was persisted, worker can catch up
-    
+
     # 8. Return 202 Accepted
     return HeartbeatResponse(
-        received=True,
-        server_id=heartbeat.server_id,
-        processed=processed,
-        replay=False
+        received=True, server_id=heartbeat.server_id, processed=processed, replay=False
     )
