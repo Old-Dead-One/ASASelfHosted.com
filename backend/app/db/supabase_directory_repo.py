@@ -436,7 +436,6 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 if last_seen_at:
                     # Parse last_seen_at if it's a string
                     if isinstance(last_seen_at, str):
-                        from datetime import datetime
                         last_seen_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
                     else:
                         last_seen_dt = last_seen_at
