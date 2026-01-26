@@ -32,7 +32,8 @@ def test_directory_servers_public(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert "data" in data
-    assert "total" in data
+    assert "limit" in data
+    assert "next_cursor" in data
     assert isinstance(data["data"], list)
 
 

@@ -71,6 +71,19 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         return list(value) if value else []
 
     @staticmethod
+    def _format_cursor_value_for_postgrest(value: object) -> str:
+        """Format cursor last_value for PostgREST or_ filter (no reserved chars in value)."""
+        if hasattr(value, "isoformat"):
+            s = value.isoformat()
+        elif value is None:
+            s = "null"
+        else:
+            s = str(value)
+        if any(c in s for c in ",:()"):
+            return f'"{s}"'
+        return s
+
+    @staticmethod
     def _map_rank_by_to_column(rank_by: RankBy) -> str:
         """
         Map rank_by parameter to database column name.
@@ -208,7 +221,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         # Map rank_by to database column
         sort_column = self._map_rank_by_to_column(rank_by)
-        is_nullable = self._is_nullable_column(sort_column)
+        # Note: directory_view COALESCEs nullable sort columns, so no special NULL handling needed
 
         # Build query from directory_view
         # Explicitly select columns matching DirectoryServer schema (minus rank fields computed in backend)
@@ -357,43 +370,30 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # This gives us OR semantics - server matches if its platforms overlap with any requested platform
                 query = query.overlaps("platforms", platforms_clean)
 
-        # Apply cursor seek predicate if cursor provided
-        # PostgREST OR syntax limitations: complex AND inside OR is not directly supported
-        # Strategy: Fetch items where sort_key <= last_value (DESC) or >= last_value (ASC)
-        # Then filter exact matches in Python based on id comparison
-        cursor_last_value = None
-        cursor_last_id = None
+        # Apply cursor seek predicate if cursor provided (route rejects cursor+q)
+        # Seek: (sort_col < last_value) OR (sort_col = last_value AND id > last_id) for DESC;
+        #       (sort_col > last_value) OR (sort_col = last_value AND id > last_id) for ASC.
+        # Use PostgREST or_() with nested and(); then limit(limit+1). No OFFSET, no Python filter.
         if parsed_cursor:
-            cursor_last_value = parsed_cursor.last_value
-            cursor_last_id = parsed_cursor.last_id
-            
-            if cursor_last_value is None:
-                # NULL handling: if last_value is NULL, we're past all NULLs
-                # For both ASC and DESC with NULLS LAST, we want non-NULL values only
-                query = query.not_.is_(sort_column, "null")
+            v = self._format_cursor_value_for_postgrest(parsed_cursor.last_value)
+            lid = str(parsed_cursor.last_id)
+            if any(c in lid for c in ",:()"):
+                lid = f'"{lid}"'
+            if order == "desc":
+                seek = f"{sort_column}.lt.{v},and({sort_column}.eq.{v},id.gt.{lid})"
             else:
-                # For DESC: fetch sort_key <= last_value (exact matches filtered in Python)
-                # For ASC: fetch sort_key >= last_value (exact matches filtered in Python)
-                if order == "desc":
-                    query = query.lte(sort_column, cursor_last_value)
-                else:
-                    query = query.gte(sort_column, cursor_last_value)
+                seek = f"{sort_column}.gt.{v},and({sort_column}.eq.{v},id.gt.{lid})"
+            query = query.or_(seek)
 
-        # SQL ordering with tie-break
-        # ORDER BY sort_column, id (id always ASC for tie-break)
-        # NULLS LAST for nullable columns (PostgREST default for DESC, explicit for ASC)
-        # Note: PostgREST Python client may not support nullsfirst parameter directly
-        # We rely on PostgREST default: NULLS LAST for DESC, NULLS FIRST for ASC
-        # For nullable columns with ASC, we may need to handle NULLs explicitly if needed
+        # ORDER BY sort_column, id (tie-break)
         if order == "asc":
             query = query.order(sort_column, desc=False).order("id", desc=False)
         else:
             query = query.order(sort_column, desc=True).order("id", desc=False)
 
-        # Cursor pagination: fetch limit + 1 to detect if there's a next page
         query = query.limit(limit + 1)
 
-        # Execute query (no count needed for cursor pagination)
+        # Execute query
         try:
             response = query.execute()
         except Exception as e:
@@ -413,39 +413,14 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             )
             raise RuntimeError(f"Failed to query directory_view: {str(e)}") from e
 
-        # Extract data
         data = response.data if hasattr(response, "data") else []
-        
-        # Filter out cursor boundary items (exact matches that should be excluded)
-        if parsed_cursor and cursor_last_value is not None and cursor_last_id:
-            filtered_data = []
-            for row in data:
-                sort_value = row.get(sort_column)
-                row_id = row.get("id")
-                
-                # Skip items that match cursor exactly but should be excluded
-                if sort_value == cursor_last_value:
-                    if order == "desc":
-                        # For DESC: exclude if id >= last_id
-                        if row_id >= cursor_last_id:
-                            continue
-                    else:
-                        # For ASC: exclude if id <= last_id
-                        if row_id <= cursor_last_id:
-                            continue
-                
-                filtered_data.append(row)
-            data = filtered_data
-        
-        # Check if there's a next page (we fetched limit + 1)
+
+        # Check if there's a next page (we have limit + 1 rows)
         has_next = len(data) > limit
         if has_next:
             data = data[:limit]  # Keep only limit items
         
         # Convert to DirectoryServer objects
-        # Note: Ranking module is created but not yet integrated into sorting
-        # Current implementation sorts by sort_column directly (quality_score, uptime_percent, etc.)
-        # Ranking module will be used when we add composite ranking or "ranking" as a rank_by option
         servers: list[DirectoryServer] = []
         last_row = None
         for row in data:
@@ -591,6 +566,10 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             return server
 
         except Exception as e:
+            from postgrest.exceptions import APIError as PostgrestAPIError
+            if isinstance(e, PostgrestAPIError) and e.code == "22P02":
+                # Invalid UUID / invalid text representation → treat as not found
+                return None
             import logging
             logger = logging.getLogger(__name__)
             logger.error(

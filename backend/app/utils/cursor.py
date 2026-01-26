@@ -6,6 +6,7 @@ Cursor format: {sort_by, order, last_value, last_id} base64-encoded JSON.
 """
 
 import base64
+import binascii
 import json
 from typing import Any
 
@@ -40,7 +41,8 @@ class Cursor:
             "last_id": self.last_id,
         }
         json_str = json.dumps(payload, sort_keys=True)
-        return base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+        # Use URL-safe base64 encoding (no + or / characters, safe for URLs without encoding)
+        return base64.urlsafe_b64encode(json_str.encode("utf-8")).decode("utf-8").rstrip("=")
 
     @staticmethod
     def decode(cursor_str: str) -> "Cursor":
@@ -51,20 +53,30 @@ class Cursor:
             DomainValidationError: If cursor is invalid
         """
         try:
-            json_str = base64.b64decode(cursor_str.encode("utf-8")).decode("utf-8")
+            # Use URL-safe base64 decoding (handles both standard and URL-safe base64)
+            # Add padding if needed (base64 requires padding, but we strip it on encode)
+            # Fix: Use (-len(s)) % 4 to correctly calculate padding (handles len % 4 == 0 case)
+            pad_len = (-len(cursor_str)) % 4
+            cursor_str_padded = cursor_str + ("=" * pad_len)
+            json_str = base64.urlsafe_b64decode(cursor_str_padded.encode("utf-8")).decode("utf-8")
             payload = json.loads(json_str)
             
             # Validate required fields
             if not all(k in payload for k in ("sort_by", "order", "last_value", "last_id")):
                 raise DomainValidationError("Invalid cursor: missing required fields")
             
+            # Validate order is asc or desc
+            order = payload["order"]
+            if order not in ("asc", "desc"):
+                raise DomainValidationError(f"Invalid cursor: order must be 'asc' or 'desc', got '{order}'")
+            
             return Cursor(
                 sort_by=payload["sort_by"],
-                order=payload["order"],
+                order=order,
                 last_value=Cursor._deserialize_value(payload["last_value"]),
                 last_id=payload["last_id"],
             )
-        except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        except (ValueError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as e:
             raise DomainValidationError(f"Invalid cursor format: {str(e)}") from e
 
     @staticmethod

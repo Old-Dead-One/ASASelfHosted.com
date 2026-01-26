@@ -15,6 +15,7 @@ def detect_player_spike_anomaly(
     heartbeats: list[Heartbeat],
     current_anomaly_flag: bool | None,
     last_anomaly_at: datetime | None,
+    now_utc: datetime,
     anomaly_decay_minutes: int = 30,
 ) -> tuple[bool, datetime | None]:
     """
@@ -36,6 +37,7 @@ def detect_player_spike_anomaly(
         heartbeats: List of heartbeats ordered by received_at DESC (most recent first)
         current_anomaly_flag: Current anomaly flag state (from previous computation)
         last_anomaly_at: Timestamp of last detected anomaly (for decay)
+        now_utc: Current UTC time (for deterministic decay evaluation)
         anomaly_decay_minutes: Minutes without spikes before clearing flag (default 30)
         
     Returns:
@@ -45,11 +47,13 @@ def detect_player_spike_anomaly(
     """
     if not heartbeats or len(heartbeats) < 2:
         # Need at least 2 heartbeats to detect spikes
+        # Invariant: flag=True implies timestamp set
+        if current_anomaly_flag and last_anomaly_at is None:
+            last_anomaly_at = now_utc
         # If no anomaly detected and enough time has passed, clear flag
         if current_anomaly_flag and last_anomaly_at:
-            now = datetime.now(timezone.utc)
             decay_threshold = last_anomaly_at + timedelta(minutes=anomaly_decay_minutes)
-            if now >= decay_threshold:
+            if now_utc >= decay_threshold:
                 return False, None
         return current_anomaly_flag or False, last_anomaly_at
     
@@ -57,7 +61,7 @@ def detect_player_spike_anomaly(
     # Heartbeats are ordered DESC (most recent first), so:
     # hb[0] = most recent (newest timestamp), hb[1] = previous (older), hb[2] = oldest
     # Chronologically: hb[2] (oldest) → hb[1] (middle) → hb[0] (newest)
-    now = datetime.now(timezone.utc)
+    # Use provided now_utc for deterministic evaluation
     anomaly_detected = False
     latest_anomaly_time = last_anomaly_at
     
@@ -113,10 +117,14 @@ def detect_player_spike_anomaly(
             latest_anomaly_time = received_newest
             break
     
+    # Invariant: flag=True implies last_anomaly_at is set (no "flag true but no timestamp")
+    if current_anomaly_flag and last_anomaly_at is None:
+        last_anomaly_at = now_utc
+
     # Apply decay: if anomaly was detected before but enough time has passed, clear it
     if not anomaly_detected and current_anomaly_flag and last_anomaly_at:
         decay_threshold = last_anomaly_at + timedelta(minutes=anomaly_decay_minutes)
-        if now >= decay_threshold:
+        if now_utc >= decay_threshold:
             return False, None
     
     # Return anomaly state

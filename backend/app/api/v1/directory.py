@@ -125,6 +125,11 @@ async def list_directory_servers(
     # Enforce max limit (400 error if > 100)
     if limit > 100:
         raise DomainValidationError(f"limit must be <= 100, got {limit}")
+    # Cursor pagination with search (q) not supported: seek uses or_(), search uses or_(); only one allowed.
+    if cursor and q and (q_trimmed := (q or "").strip()):
+        raise DomainValidationError(
+            "Cursor pagination is not supported when using search (q). Omit q to use cursor."
+        )
     
     # Normalize players_min/max to players_current_min/max for repository
     # Use explicit None check (0 is valid and falsy)
@@ -223,9 +228,9 @@ async def list_directory_clusters(
     limit: int = Query(default=25, ge=1, le=100, description="Maximum items to return (max 100)"),
     cursor: str | None = Query(default=None, description="Opaque cursor for pagination (from previous response)"),
     visibility: ClusterVisibility | None = Query(
-        default=None, description="Filter by visibility (public/unlisted). If None, returns public only."
+        default=None, description="Filter by visibility. Only 'public' is supported for public directory. Unlisted clusters are not accessible via public endpoints."
     ),
-    sort_by: str = Query(default="updated", description="Sort clusters by (updated or name)"),
+    sort_by: str = Query(default="updated", description="Sort clusters by (updated or name). Note: server_count sorting not yet supported."),
     order: SortOrder = Query(default="desc", description="Sort order for sort_by"),
     repo: DirectoryClustersRepository = Depends(get_directory_clusters_repo),
     _user: UserIdentity | None = Depends(get_optional_user),
@@ -242,12 +247,19 @@ async def list_directory_clusters(
     Visibility Rules:
         - If visibility is None: returns only public clusters (default)
         - If visibility is "public": returns only public clusters
-        - If visibility is "unlisted": returns only unlisted clusters (requires explicit filter)
+        - If visibility is "unlisted": returns 400 Bad Request (unlisted clusters not accessible via public directory)
+        
+    Note: Unlisted clusters are owner-only (RLS-enforced) and cannot be accessed via public directory endpoints.
+    This endpoint only supports public clusters.
     """
     # Enforce max limit (400 error if > 100)
     if limit > 100:
         raise DomainValidationError(f"limit must be <= 100, got {limit}")
-    
+    # Reject unlisted: public directory is public-only
+    if visibility == "unlisted":
+        raise DomainValidationError(
+            "Unlisted clusters are not accessible via public directory. Only 'public' is supported."
+        )
     # Validate sort_by
     if sort_by not in ("updated", "name"):
         raise DomainValidationError(f"sort_by must be 'updated' or 'name', got {sort_by}")
@@ -286,13 +298,12 @@ async def get_directory_cluster(
     Public endpoint - returns cluster if it's accessible.
     
     Visibility Rules:
-        - public: returns cluster (readable by everyone)
-        - unlisted: returns cluster if found (may require owner authentication due to RLS)
-        - private: does not exist in DB enum, so not applicable
-    
-    Note: Unlisted clusters may not be accessible via this endpoint if RLS policies
-    restrict access to owners only. This is a known limitation that may require
-    RLS policy adjustments for full unlisted cluster support.
+        - public: Returns cluster if found (readable by everyone)
+        - unlisted: Returns 404 (unlisted clusters are not accessible via public directory endpoints)
+        - private: Does not exist in DB enum, so not applicable
+        
+    Note: This endpoint only supports public clusters. Unlisted clusters are owner-only (RLS-enforced)
+    and cannot be accessed via public directory endpoints.
     """
     # Get request handling time
     now_utc = datetime.now(timezone.utc)

@@ -37,7 +37,7 @@ class DirectoryClustersRepository(ABC):
         Args:
             limit: Maximum number of items to return (default 25, max 100)
             cursor: Opaque cursor string for pagination (from previous response)
-            visibility: Filter by visibility (public/unlisted). If None, returns public only.
+            visibility: Filter by visibility. Only "public" is supported; "unlisted" is rejected.
             sort_by: Sort key ("updated" or "name")
             order: Sort order (asc/desc)
             now_utc: Request handling time for consistency (must be consistent across response)
@@ -45,11 +45,10 @@ class DirectoryClustersRepository(ABC):
         Returns:
             Tuple of (cluster list, next_cursor). next_cursor is None if no more results.
             
-        Visibility Rules:
-            - public: appears in lists, can be fetched by id
-            - unlisted: does NOT appear in lists (unless visibility filter is explicitly set),
-              but GET /directory/clusters/{id} returns 200 if id is known
-            - private: does not exist in DB enum, so not supported
+        Visibility Rules (public directory):
+            - public-only exposure. Unlisted clusters are not accessible via directory endpoints.
+            - list: returns only public clusters
+            - get by id: returns only if cluster is public (unlisted → 404)
         """
         ...
 
@@ -67,11 +66,7 @@ class DirectoryClustersRepository(ABC):
             now_utc: Request handling time for consistency
             
         Returns:
-            DirectoryCluster if found and visible, None otherwise
-            
-        Visibility Rules:
-            - public: returns cluster
-            - unlisted: returns cluster (can be fetched by id even if not in lists)
-            - private: does not exist, so not applicable
+            DirectoryCluster if found and public, None otherwise.
+            Unlisted clusters return None (public directory is public-only).
         """
         ...

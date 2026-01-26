@@ -10,6 +10,7 @@ from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.db.directory_repo import DirectoryRepository
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
+from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
 from app.db.servers_derived_repo import ServersDerivedRepository
 from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRepository
@@ -20,6 +21,7 @@ from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepositor
 
 # Reuse a single mock repo instance (stateless, so safe to share)
 _mock_repo = MockDirectoryRepository()
+_mock_clusters_repo = MockDirectoryClustersRepository()
 
 # Reuse a single Supabase repo instance (stateless client, safe to share)
 _supabase_repo: SupabaseDirectoryRepository | None = None
@@ -153,21 +155,26 @@ def get_directory_clusters_repo() -> DirectoryClustersRepository:
         # If Supabase repo is configured, use it
         if _supabase_clusters_repo and _supabase_clusters_repo._configured:
             return _supabase_clusters_repo
-        # If Supabase repo exists but isn't configured, raise in staging/production
-        elif settings.ENV not in ("local", "development", "test"):
+        # If Supabase repo exists but isn't configured, fall back to mock in local/dev/test
+        elif settings.ENV in ("local", "development", "test"):
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Supabase clusters repository not configured ({_supabase_clusters_repo._config_error if _supabase_clusters_repo else 'not initialized'}), "
+                "falling back to mock data"
+            )
+            return _mock_clusters_repo
+        else:
+            # In staging/production, must have Supabase
             raise RuntimeError(
                 f"Directory clusters repository not configured: {_supabase_clusters_repo._config_error if _supabase_clusters_repo else 'not initialized'}"
             )
     
-    # No Supabase credentials - fail in staging/production
-    if settings.ENV not in ("local", "development", "test"):
+    # No Supabase credentials - use mock in local/dev/test, fail in staging/production
+    if settings.ENV in ("local", "development", "test"):
+        return _mock_clusters_repo
+    else:
         raise RuntimeError(
             "Supabase credentials required in staging/production. "
             "Set SUPABASE_URL and SUPABASE_ANON_KEY in environment."
         )
-    
-    # In local/dev/test without Supabase, raise (no mock implementation for clusters yet)
-    raise RuntimeError(
-        "Directory clusters repository requires Supabase. "
-        "Set SUPABASE_URL and SUPABASE_ANON_KEY in environment."
-    )

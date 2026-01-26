@@ -142,12 +142,14 @@ async def process_heartbeat_jobs(
                         heartbeats
                     )
                     
-                    # Run anomaly detection engine
+                    # Run anomaly detection engine (use deterministic now_utc)
+                    now_utc = datetime.now(timezone.utc)
                     anomaly_flag, anomaly_last_detected_at = detect_player_spike_anomaly(
                         job["server_id"],
                         heartbeats,
                         current_anomaly_flag,
                         last_anomaly_at,
+                        now_utc=now_utc,
                         anomaly_decay_minutes=settings.ANOMALY_DECAY_MINUTES
                     )
                     

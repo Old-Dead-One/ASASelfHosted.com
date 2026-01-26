@@ -76,6 +76,9 @@ class FakeDerivedRepo(ServersDerivedRepository):
     ) -> None:
         self.fast_updates.append((server_id, received_at, heartbeat_timestamp, players_current, players_capacity))
 
+    async def get_current_anomaly_state(self, server_id: str) -> tuple[bool | None, datetime | None]:
+        return False, None
+
 
 def sign_envelope(priv: Ed25519PrivateKey, envelope: dict) -> str:
     msg = canonicalize_heartbeat_envelope(envelope)

@@ -57,21 +57,50 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
                 self._config_error = f"Supabase client initialization failed: {str(e)}"
 
     @staticmethod
+    def _format_cursor_value_for_postgrest(value: object) -> str:
+        """Format cursor last_value for PostgREST or_ filter."""
+        if hasattr(value, "isoformat"):
+            s = value.isoformat()
+        elif value is None:
+            s = "null"
+        else:
+            s = str(value)
+        if any(c in s for c in ",:()"):
+            return f'"{s}"'
+        return s
+
+    @staticmethod
     def _map_sort_by_to_column(sort_by: str) -> str:
         """
         Map sort_by parameter to database column name.
         
         Args:
             sort_by: Sort key parameter ("updated" or "name")
+            Note: "server_count" is not yet supported (requires aggregation/view)
             
         Returns:
             Database column name for sorting
+            
+        Raises:
+            DomainValidationError: If sort_by is not supported
         """
+        if sort_by not in ("updated", "name"):
+            from app.core.errors import DomainValidationError
+            raise DomainValidationError(
+                f"sort_by must be 'updated' or 'name', got '{sort_by}'. "
+                "server_count sorting is not yet supported."
+            )
         mapping = {
             "updated": "updated_at",
             "name": "name",
         }
-        return mapping.get(sort_by, "updated_at")  # Default to updated_at
+        if sort_by not in mapping:
+            from app.core.errors import DomainValidationError
+            raise DomainValidationError(
+                f"sort_by must be 'updated' or 'name', got '{sort_by}'. "
+                "server_count sorting is not yet supported."
+            )
+        return mapping[sort_by]
 
     async def list_clusters(
         self,
@@ -88,7 +117,10 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
         Visibility Rules:
             - If visibility is None: return only public clusters (default for directory listing)
             - If visibility is "public": return only public clusters
-            - If visibility is "unlisted": return only unlisted clusters (requires explicit filter)
+            - If visibility is "unlisted": raise DomainValidationError (unlisted clusters not accessible via public directory)
+            
+        Note: This repository uses anon key, so unlisted clusters are RLS-blocked for anonymous requests.
+        Public directory endpoints only support public clusters.
         """
         if not self._configured:
             error_msg = "SupabaseDirectoryClustersRepository not configured"
@@ -121,41 +153,35 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
         select_columns = "id,name,slug,visibility,created_at,updated_at"
         query = self._supabase.table("clusters").select(select_columns)
 
-        # Apply visibility filter
-        # Default: only public clusters (unless explicitly filtered)
-        if visibility is None:
-            # Default behavior: only public clusters appear in directory listings
-            query = query.eq("visibility", "public")
-        else:
-            # Explicit filter: return clusters with specified visibility
-            query = query.eq("visibility", visibility)
+        # Apply visibility filter: public-only (reject unlisted)
+        if visibility == "unlisted":
+            raise DomainValidationError(
+                "Unlisted clusters are not accessible via public directory. Only 'public' is supported."
+            )
+        # visibility is None or "public" → return only public clusters
+        query = query.eq("visibility", "public")
 
-        # Apply cursor seek predicate
-        cursor_last_value = None
-        cursor_last_id = None
+        # Apply cursor seek predicate if cursor provided
+        # Seek: (sort_col < last_value) OR (sort_col = last_value AND id > last_id) for DESC;
+        #       (sort_col > last_value) OR (sort_col = last_value AND id > last_id) for ASC.
+        # Use PostgREST or_() with nested and(); then limit(limit+1). No OFFSET, no Python filter.
         if parsed_cursor:
-            cursor_last_value = parsed_cursor.last_value
-            cursor_last_id = parsed_cursor.last_id
-            
-            if cursor_last_value is None:
-                # NULL handling: if last_value is NULL, we're past all NULLs
-                query = query.not_.is_(sort_column, "null")
+            v = self._format_cursor_value_for_postgrest(parsed_cursor.last_value)
+            lid = str(parsed_cursor.last_id)
+            if any(c in lid for c in ",:()"):
+                lid = f'"{lid}"'
+            if order == "desc":
+                seek = f"{sort_column}.lt.{v},and({sort_column}.eq.{v},id.gt.{lid})"
             else:
-                # For DESC: fetch sort_key <= last_value (exact matches filtered in Python)
-                # For ASC: fetch sort_key >= last_value (exact matches filtered in Python)
-                if order == "desc":
-                    query = query.lte(sort_column, cursor_last_value)
-                else:
-                    query = query.gte(sort_column, cursor_last_value)
+                seek = f"{sort_column}.gt.{v},and({sort_column}.eq.{v},id.gt.{lid})"
+            query = query.or_(seek)
 
-        # SQL ordering with tie-break
-        # ORDER BY sort_column, id (id always ASC for tie-break)
+        # ORDER BY sort_column, id (tie-break)
         if order == "asc":
             query = query.order(sort_column, desc=False).order("id", desc=False)
         else:
             query = query.order(sort_column, desc=True).order("id", desc=False)
 
-        # Cursor pagination: fetch limit + 1 to detect if there's a next page
         query = query.limit(limit + 1)
 
         # Execute query
@@ -164,31 +190,9 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
         except Exception as e:
             raise RuntimeError(f"Failed to query clusters: {str(e)}") from e
 
-        # Extract data
         data = response.data if hasattr(response, "data") else []
-        
-        # Filter out cursor boundary items (exact matches that should be excluded)
-        if parsed_cursor and cursor_last_value is not None and cursor_last_id:
-            filtered_data = []
-            for row in data:
-                sort_value = row.get(sort_column)
-                row_id = row.get("id")
-                
-                # Skip items that match cursor exactly but should be excluded
-                if sort_value == cursor_last_value:
-                    if order == "desc":
-                        # For DESC: exclude if id >= last_id
-                        if row_id >= cursor_last_id:
-                            continue
-                    else:
-                        # For ASC: exclude if id <= last_id
-                        if row_id <= cursor_last_id:
-                            continue
-                
-                filtered_data.append(row)
-            data = filtered_data
-        
-        # Check if there's a next page (we fetched limit + 1)
+
+        # Check if there's a next page (we have limit + 1 rows)
         has_next = len(data) > limit
         if has_next:
             data = data[:limit]  # Keep only limit items
@@ -260,16 +264,16 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
         Get cluster by ID from Supabase.
         
         Visibility Rules:
-            - public: returns cluster (readable by everyone via RLS)
-            - unlisted: returns cluster if found (RLS allows owners to read unlisted clusters)
-            - private: does not exist in DB enum, so not applicable
+            - public: Returns cluster if found (readable by everyone)
+            - unlisted: Returns None (404 in route layer) - unlisted clusters not accessible via public directory
+            - private: Does not exist in DB enum, so not applicable
+            
+        CONTRACT DECISION (Sprint 5):
+        - Public directory endpoints only support public clusters
+        - Unlisted clusters are owner-only (RLS-enforced) and cannot be accessed via public endpoints
+        - Anonymous requests to unlisted cluster IDs return 404
         
-        Note: Current RLS policy allows:
-            - Public clusters: readable by everyone
-            - Unlisted clusters: only readable by owners
-        This means unlisted clusters will only be returned if the request is authenticated
-        as the owner. For public directory access, unlisted clusters may not be accessible
-        unless RLS policies are adjusted or service_role key is used.
+        This implementation uses anon key, so RLS policies block unlisted cluster access.
         """
         if not self._configured:
             error_msg = "SupabaseDirectoryClustersRepository not configured"
@@ -286,6 +290,7 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
                 self._supabase.table("clusters")
                 .select(select_columns)
                 .eq("id", cluster_id)
+                .eq("visibility", "public")
                 .limit(1)
                 .execute()
             )
