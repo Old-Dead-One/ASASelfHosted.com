@@ -13,11 +13,13 @@ from app.db.heartbeat_repo import HeartbeatRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
 from app.db.servers_derived_repo import ServersDerivedRepository
+from app.db.servers_repo import ServersRepository
 from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRepository
 from app.db.supabase_directory_repo import SupabaseDirectoryRepository
 from app.db.supabase_heartbeat_jobs_repo import SupabaseHeartbeatJobsRepository
 from app.db.supabase_heartbeat_repo import SupabaseHeartbeatRepository
 from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepository
+from app.db.supabase_servers_repo import SupabaseServersRepository
 
 # Reuse a single mock repo instance (stateless, so safe to share)
 _mock_repo = MockDirectoryRepository()
@@ -186,3 +188,19 @@ def get_directory_clusters_repo() -> DirectoryClustersRepository:
             "Supabase credentials required in staging/production. "
             "Set SUPABASE_URL and SUPABASE_ANON_KEY in environment."
         )
+
+
+def get_servers_repo(user_jwt: str) -> ServersRepository:
+    """
+    Servers repository provider.
+    
+    Creates a request-scoped repository with RLS client.
+    Requires user JWT token for RLS enforcement.
+    
+    Args:
+        user_jwt: User's JWT token (from Authorization header)
+    
+    Returns:
+        SupabaseServersRepository with RLS client configured
+    """
+    return SupabaseServersRepository(user_jwt)

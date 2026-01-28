@@ -70,6 +70,7 @@ def insert_sample_servers(supabase_admin, owner_user_id):
     servers = [
         {
             "owner_user_id": owner_user_id,
+            "hosting_provider": "self_hosted",  # Required for directory_view
             "name": "Island PvP Server",
             "description": "A classic vanilla PvP experience on The Island. Active community, regular events!",
             "map_name": "The Island",
@@ -100,6 +101,7 @@ def insert_sample_servers(supabase_admin, owner_user_id):
         },
         {
             "owner_user_id": owner_user_id,
+            "hosting_provider": "self_hosted",  # Required for directory_view
             "name": "Modded PvE Paradise",
             "description": "Heavily modded PvE server with quality of life improvements. Perfect for casual players!",
             "map_name": "The Island",
@@ -129,6 +131,7 @@ def insert_sample_servers(supabase_admin, owner_user_id):
         },
         {
             "owner_user_id": owner_user_id,
+            "hosting_provider": "self_hosted",  # Required for directory_view
             "name": "Scorched Earth Boosted",
             "description": "Boosted rates on Scorched Earth. PvP during weekdays, PvE on weekends!",
             "map_name": "Scorched Earth",
@@ -159,6 +162,7 @@ def insert_sample_servers(supabase_admin, owner_user_id):
         },
         {
             "owner_user_id": owner_user_id,
+            "hosting_provider": "self_hosted",  # Required for directory_view
             "name": "Vanilla+ PvE Community",
             "description": "Vanilla experience with quality of life improvements. Great for beginners!",
             "map_name": "The Island",
@@ -189,6 +193,7 @@ def insert_sample_servers(supabase_admin, owner_user_id):
         },
         {
             "owner_user_id": owner_user_id,
+            "hosting_provider": "self_hosted",  # Required for directory_view
             "name": "Official+ Crossplay Server",
             "description": "Official-like experience with crossplay support. All platforms welcome!",
             "map_name": "The Island",

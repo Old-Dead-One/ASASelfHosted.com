@@ -40,9 +40,8 @@ export interface DirectoryServer {
     map_name: string | null
 
     // Join information
-    // Note: join_password is NOT included in public directory contract
-    // If password handling is needed, use a separate owner-only schema
     join_address: string | null
+    join_password: string | null  // Server password (public, visible to all players)
     join_instructions_pc: string | null
     join_instructions_console: string | null
 
@@ -98,9 +97,9 @@ export interface DirectoryServer {
     is_new: boolean
     is_stable: boolean
 
-    // Classification (mutually exclusive ruleset)
-    // Optional in Sprint 2.x; required once classification is guaranteed (Sprint 3+)
+    // Classification
     ruleset: Ruleset | null
+    rulesets?: string[] // Multi-value when supported (migration 015); at most one of vanilla/vanilla_qol/modded; boosted optional
     // TODO (Sprint 3+): Remove server_type - fully replaced by ruleset
     server_type: ServerType | null // Deprecated: use ruleset instead
 
@@ -109,7 +108,7 @@ export interface DirectoryServer {
 
     // Platform and feature flags (computed in directory_view)
     platforms: Platform[] // Known platform universe for type safety
-    is_official_plus: boolean | null // Official+ servers (enhanced official-like experience)
+    is_official_plus: boolean | null // Vanilla-style setup (vanilla-like experience; "Official" refers to who owns the server)
     is_modded: boolean | null // Has mods (derived from mod_list). Note: This checks for installed mods, not ruleset classification
     is_crossplay: boolean | null // Cross-platform support
     is_console: boolean | null // Console support
@@ -120,9 +119,9 @@ export interface DirectoryServer {
 
 export interface DirectoryResponse {
     data: DirectoryServer[]
-    total: number
-    page: number
-    page_size: number
+    limit: number
+    cursor: string | null
+    next_cursor: string | null
 
     // Optional echo for debugging / client UI (reflects actual applied values)
     rank_by: RankBy | null
@@ -141,7 +140,9 @@ export type BadgeType =
     | 'pve'
     | 'pvpve'
     | 'vanilla'
+    | 'vanilla_qol'
     | 'boosted'
+    | 'modded'
     | 'newbie_friendly' // UI-only, not in API contract
     | 'learning_friendly' // UI-only, not in API contract
 

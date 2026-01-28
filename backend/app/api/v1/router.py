@@ -14,6 +14,7 @@ from app.api.v1 import (
     clusters,
     consent,
     directory,
+    favorites,
     heartbeat,
     servers,
     subscriptions,
@@ -29,6 +30,8 @@ router = APIRouter()
 router.include_router(directory.router)
 # Server router (CRUD, owner-managed)
 router.include_router(servers.router)
+# Favorites router (nested under servers)
+router.include_router(favorites.router)
 router.include_router(clusters.router)
 router.include_router(verification.router)
 router.include_router(heartbeat.router)

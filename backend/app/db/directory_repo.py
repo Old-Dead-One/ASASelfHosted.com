@@ -68,6 +68,7 @@ class DirectoryRepository(ABC):
         crossplay: TriState = "any",
         console: TriState = "any",
         pc: TriState = "any",  # PC support filter (canonical name)
+        is_cluster: TriState = "any",  # Filter by cluster association (true = has cluster, false = no cluster)
         # Multi-select filters (OR semantics)
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,

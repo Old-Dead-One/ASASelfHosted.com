@@ -224,23 +224,35 @@ async def process_heartbeat_jobs(
         except Exception as e:
             # Worker-level error - log and continue
             error_str = str(e)
+            error_lower = error_str.lower()
+            
+            # Log the actual error first (for debugging)
+            logger.error(
+                f"Heartbeat worker error: {error_str}",
+                extra={"error": str(e), "error_type": type(e).__name__},
+                exc_info=True,
+            )
+            
             # Check for missing table error (migration not run)
-            if "heartbeat_jobs" in error_str.lower() and (
-                "not find" in error_str.lower() or "schema cache" in error_str.lower()
-            ):
+            # Be more specific: look for actual Postgres "relation does not exist" errors
+            is_missing_table = (
+                "heartbeat_jobs" in error_lower
+                and (
+                    ("relation" in error_lower and "does not exist" in error_lower)
+                    or ("table" in error_lower and "not found" in error_lower)
+                    or ("schema cache" in error_lower and "heartbeat_jobs" in error_lower)
+                )
+            )
+            
+            if is_missing_table:
                 logger.error(
                     "Heartbeat worker: migration not run. Please run 006_sprint_4_agent_auth.sql in Supabase.",
-                    extra={"error": error_str},
+                    extra={"error": error_str, "error_type": type(e).__name__},
                 )
                 # Sleep longer before retrying (don't spam logs)
                 await asyncio.sleep(60)  # Wait 60 seconds before retrying
             else:
-                logger.error(
-                    "Heartbeat worker error (non-fatal, continuing)",
-                    extra={"error": str(e)},
-                    exc_info=True,
-                )
-                # Sleep before retrying
+                # Other error - sleep and retry
                 await asyncio.sleep(settings.HEARTBEAT_JOB_POLL_INTERVAL_SECONDS)
 
 

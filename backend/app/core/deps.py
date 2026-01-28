@@ -16,6 +16,25 @@ from app.core.security import (
 )
 
 
+def extract_bearer_token(request: Request) -> str | None:
+    """
+    Extract bearer token from Authorization header.
+    
+    Public helper for extracting JWT tokens from requests.
+    
+    Returns token string if present and valid, None otherwise.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+
+    if not auth_header.lower().startswith("bearer "):
+        return None
+
+    token = auth_header[7:].strip()
+    return token or None
+
+
 def _extract_bearer_token(request: Request) -> str | None:
     """
     Extract bearer token from Authorization header.

@@ -126,6 +126,9 @@ async def list_directory_servers(
     pc: TriState = Query(
         default="any", description="Filter PC support (any/true/false)"
     ),
+    is_cluster: TriState = Query(
+        default="any", description="Filter by cluster association (any/true/false). true = has cluster, false = no cluster"
+    ),
     # Multi-select filters (OR semantics)
     maps: list[str] | None = Query(
         default=None, description="Filter by map names (OR)"
@@ -199,6 +202,7 @@ async def list_directory_servers(
         crossplay=crossplay,
         console=console,
         pc=pc,
+        is_cluster=is_cluster,
         maps=maps,
         mods=mods,
         platforms=platforms,

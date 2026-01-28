@@ -184,6 +184,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         crossplay: TriState = "any",
         console: TriState = "any",
         pc: TriState = "any",  # PC support filter (canonical name)
+        is_cluster: TriState = "any",  # Filter by cluster association (true = has cluster, false = no cluster)
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
@@ -226,6 +227,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         # Build query from directory_view
         # Explicitly select columns matching DirectoryServer schema (minus rank fields computed in backend)
         # This prevents failures if view accidentally includes extra columns (extra="forbid" in BaseSchema)
+        # Select ruleset only; directory_view may not have rulesets (migration 015). We derive rulesets from ruleset below.
         select_columns = (
             "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
             "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
@@ -304,6 +306,15 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         if quality_min is not None:
             query = query.gte("quality_score", quality_min)
 
+        # Apply is_cluster filter (tri-state: any/true/false)
+        # true = has cluster_id, false = no cluster_id
+        if is_cluster == "true":
+            # Has cluster: cluster_id IS NOT NULL
+            query = query.not_.is_("cluster_id", "null")
+        elif is_cluster == "false":
+            # No cluster: cluster_id IS NULL
+            query = query.is_("cluster_id", "null")
+        
         # Apply tri-state filters (critical: unknown/NULL does NOT match false)
         # Helper to normalize tri-state
         def _normalize_tristate(ts: TriState) -> bool | None:
@@ -434,6 +445,9 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                 # DirectoryServer requires list, not Optional or string
                 row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
                 row["platforms"] = self._normalize_array_field(row.get("platforms"))
+                # directory_view may only have ruleset; DirectoryServer expects rulesets list
+                if "rulesets" not in row or row.get("rulesets") is None:
+                    row["rulesets"] = [row["ruleset"]] if row.get("ruleset") else []
 
                 # Compute seconds_since_seen
                 last_seen_at = row.get("last_seen_at")
@@ -515,8 +529,9 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         try:
             # Explicitly select columns matching DirectoryServer schema (minus rank fields)
             # This prevents failures if view accidentally includes extra columns (extra="forbid" in BaseSchema)
-            select_columns = (
-                "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
+            # Try with join_password first (if migration 014 has been run)
+            select_columns_with_password = (
+                "id,name,description,map_name,join_address,join_password,join_instructions_pc,join_instructions_console,"
                 "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
                 "created_at,updated_at,cluster_id,cluster_name,cluster_slug,cluster_visibility,"
                 "favorite_count,is_verified,is_new,is_stable,ruleset,game_mode,server_type,"
@@ -525,7 +540,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             )
             response = (
                 self._supabase.table("directory_view")
-                .select(select_columns)
+                .select(select_columns_with_password)
                 .eq("id", server_id)
                 .limit(1)
                 .execute()
@@ -575,6 +590,66 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         except Exception as e:
             from postgrest.exceptions import APIError as PostgrestAPIError
 
+            # If join_password or rulesets column doesn't exist (migration 014/015 not run), retry without them
+            if isinstance(e, PostgrestAPIError) and (
+                e.code == "42703" and ("join_password" in str(e) or "rulesets" in str(e))
+            ):
+                # Retry without join_password and without rulesets
+                select_columns_without_password = (
+                    "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
+                    "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
+                    "created_at,updated_at,cluster_id,cluster_name,cluster_slug,cluster_visibility,"
+                    "favorite_count,is_verified,is_new,is_stable,ruleset,game_mode,server_type,"
+                    "platforms,is_official_plus,is_modded,is_crossplay,is_console,is_pc,"
+                    "players_current,players_capacity,quality_score,uptime_percent"
+                )
+                response = (
+                    self._supabase.table("directory_view")
+                    .select(select_columns_without_password)
+                    .eq("id", server_id)
+                    .limit(1)
+                    .execute()
+                )
+                
+                data = response.data if hasattr(response, "data") else []
+                if not data:
+                    return None
+                
+                row = data[0]
+                # Add join_password as None since column doesn't exist
+                row["join_password"] = None
+                # rulesets may not exist in view; derive from ruleset
+                if "rulesets" not in row and row.get("ruleset"):
+                    row["rulesets"] = [row["ruleset"]]
+                
+                # Normalize array fields
+                row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
+                row["platforms"] = self._normalize_array_field(row.get("platforms"))
+                
+                # Compute seconds_since_seen
+                now_utc = datetime.now(timezone.utc)
+                last_seen_at = row.get("last_seen_at")
+                seconds_since_seen = None
+                if last_seen_at:
+                    if isinstance(last_seen_at, str):
+                        last_seen_dt = datetime.fromisoformat(
+                            last_seen_at.replace("Z", "+00:00")
+                        )
+                    else:
+                        last_seen_dt = last_seen_at
+                    if last_seen_dt.tzinfo is None:
+                        last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                    delta = (now_utc - last_seen_dt).total_seconds()
+                    seconds_since_seen = max(0.0, delta)
+                
+                server = DirectoryServer(
+                    **row,
+                    seconds_since_seen=seconds_since_seen,
+                    rank_by="updated",
+                    rank_delta_24h=None,
+                )
+                return server
+            
             if isinstance(e, PostgrestAPIError) and e.code == "22P02":
                 # Invalid UUID / invalid text representation → treat as not found
                 return None

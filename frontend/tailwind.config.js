@@ -14,7 +14,10 @@ export default {
       colors: {
         // Semantic tokens via CSS variables
         // These map to CSS variables defined in index.css
-        background: 'hsl(var(--background))',
+        background: {
+          DEFAULT: 'hsl(var(--background))',
+          elevated: 'hsl(var(--background-elevated))',
+        },
         foreground: 'hsl(var(--foreground))',
         card: {
           DEFAULT: 'hsl(var(--card))',

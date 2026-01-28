@@ -96,14 +96,23 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
 
         except Exception as e:
             error_str = str(e)
-            # Check for missing table error (migration not run)
-            if "heartbeat_jobs" in error_str.lower() and (
-                "not find" in error_str.lower() or "schema cache" in error_str.lower()
+            error_lower = error_str.lower()
+            # Check for missing table error (migration not run OR PostgREST cache issue)
+            if "heartbeat_jobs" in error_lower and (
+                "not find" in error_lower or "schema cache" in error_lower or "pgrst205" in error_lower
             ):
-                raise RuntimeError(
-                    f"heartbeat_jobs table not found. Please run migration 006_sprint_4_agent_auth.sql in Supabase. "
-                    f"Original error: {error_str}"
-                ) from e
+                # PGRST205 = PostgREST schema cache issue (table exists but cache is stale)
+                if "pgrst205" in error_lower or "schema cache" in error_lower:
+                    raise RuntimeError(
+                        f"PostgREST schema cache issue: heartbeat_jobs table not found in cache. "
+                        f"Refresh the schema cache in Supabase Dashboard: Settings → API → 'Reload schema cache'. "
+                        f"Original error: {error_str}"
+                    ) from e
+                else:
+                    raise RuntimeError(
+                        f"heartbeat_jobs table not found. Please run migration 006_sprint_4_agent_auth.sql in Supabase. "
+                        f"Original error: {error_str}"
+                    ) from e
             # Handle unique constraint violation gracefully (race condition)
             error_str_lower = error_str.lower()
             if "unique" in error_str_lower or "duplicate" in error_str_lower:
@@ -215,14 +224,23 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
 
         except Exception as e:
             error_str = str(e)
-            # Check for missing table error (migration not run)
-            if "heartbeat_jobs" in error_str.lower() and (
-                "not find" in error_str.lower() or "schema cache" in error_str.lower()
+            error_lower = error_str.lower()
+            # Check for missing table error (migration not run OR PostgREST cache issue)
+            if "heartbeat_jobs" in error_lower and (
+                "not find" in error_lower or "schema cache" in error_lower or "pgrst205" in error_lower
             ):
-                raise RuntimeError(
-                    f"heartbeat_jobs table not found. Please run migration 006_sprint_4_agent_auth.sql in Supabase. "
-                    f"Original error: {error_str}"
-                ) from e
+                # PGRST205 = PostgREST schema cache issue (table exists but cache is stale)
+                if "pgrst205" in error_lower or "schema cache" in error_lower:
+                    raise RuntimeError(
+                        f"PostgREST schema cache issue: heartbeat_jobs table not found in cache. "
+                        f"Refresh the schema cache in Supabase Dashboard: Settings → API → 'Reload schema cache'. "
+                        f"Original error: {error_str}"
+                    ) from e
+                else:
+                    raise RuntimeError(
+                        f"heartbeat_jobs table not found. Please run migration 006_sprint_4_agent_auth.sql in Supabase. "
+                        f"Original error: {error_str}"
+                    ) from e
             raise RuntimeError(f"Failed to claim jobs: {str(e)}") from e
 
     async def mark_processed(self, job_id: str, processed_at: datetime) -> None:

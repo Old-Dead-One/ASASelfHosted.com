@@ -1,12 +1,15 @@
-import { Layout } from './components/layout/Layout'
-import { HomePage } from './pages/HomePage'
+import { RouterProvider } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { router } from './routes'
 
 function App() {
     return (
-        <Layout>
-            {/* Route outlet goes here - replace HomePage with router when routing is added */}
-            <HomePage />
-        </Layout>
+        <ErrorBoundary>
+            <AuthProvider>
+                <RouterProvider router={router} />
+            </AuthProvider>
+        </ErrorBoundary>
     )
 }
 

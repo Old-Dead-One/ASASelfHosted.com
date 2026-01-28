@@ -10,7 +10,10 @@ import logging
 from datetime import datetime, timezone
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,3 +170,30 @@ def verify_ed25519_signature(
     except Exception:
         # Any other error (shouldn't happen, but be defensive)
         return False
+
+
+def generate_ed25519_key_pair() -> tuple[str, str]:
+    """
+    Generate Ed25519 key pair for cluster agent authentication.
+
+    Returns:
+        Tuple of (private_key_b64, public_key_b64) both base64-encoded
+
+    Note:
+        Private key should be shown to user once and never stored.
+        Public key is stored in clusters table for signature verification.
+    """
+    # Generate Ed25519 private key
+    private_key = Ed25519PrivateKey.generate()
+
+    # Get public key from private key
+    public_key = private_key.public_key()
+
+    # Encode both as base64
+    private_key_bytes = private_key.private_bytes_raw()
+    public_key_bytes = public_key.public_bytes_raw()
+
+    private_key_b64 = base64.b64encode(private_key_bytes).decode("utf-8")
+    public_key_b64 = base64.b64encode(public_key_bytes).decode("utf-8")
+
+    return (private_key_b64, public_key_b64)

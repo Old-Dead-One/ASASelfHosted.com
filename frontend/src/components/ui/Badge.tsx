@@ -28,9 +28,9 @@ const badgeConfig: Record<BadgeType, { label: string; variant: string }> = {
     pvpve: { label: 'PvPvE', variant: accentOutline },
 
     vanilla: { label: 'Vanilla', variant: 'bg-muted text-muted-foreground border border-muted-foreground' },
-
-    // Until you define real "warning" tokens, keep this inside existing palette
+    vanilla_qol: { label: 'Vanilla QoL', variant: 'bg-muted text-muted-foreground border border-muted-foreground' },
     boosted: { label: 'Boosted', variant: accentOutline },
+    modded: { label: 'Modded', variant: accentOutline },
 
     newbie_friendly: { label: 'Newbie Friendly', variant: accentOutline },
     learning_friendly: { label: 'Learning Friendly', variant: accentOutline },

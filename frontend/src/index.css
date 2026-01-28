@@ -6,24 +6,28 @@
 
 @layer base {
   :root {
-    /* Base: Slate/graphite neutrals */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base: Grey color scheme */
+    /* Dark grey for page backgrounds */
+    --background: 220 15% 12%;
+    /* Slightly lighter than background for elevated surfaces (e.g. form cards) */
+    --background-elevated: 220 15% 17%;
+    --foreground: 210 30% 95%;
     
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Medium grey for navbar/cards */
+    --card: 220 8% 50%;
+    --card-foreground: 210 30% 95%;
     
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 8% 50%;
+    --popover-foreground: 210 30% 95%;
     
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 10% 20%;
+    --muted-foreground: 215.4 16.3% 70%;
     
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 210 30% 95%;
     
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 220 8% 35%;
+    --input: 220 8% 30%;
     
     /* Primary: Cyan accent (tactical sci-fi) */
     --primary: 188 85% 45%;
@@ -46,8 +50,8 @@
     --warning-foreground: 0 0% 100%;
     
     /* Tactical accents */
-    --gridline: 214.3 31.8% 85%;
-    --panel: 210 40% 98%;
+    --gridline: 220 8% 35%;
+    --panel: 220 8% 45%;
     
     /* Border radius */
     --radius: 0.5rem;
@@ -56,6 +60,7 @@
   .dark {
     /* Dark mode: Cooler, slightly desaturated slate base */
     --background: 222.2 47.4% 11.2%;
+    --background-elevated: 222.2 47.4% 14%;
     --foreground: 210 40% 98%;
     
     --card: 222.2 47.4% 11.2%;
@@ -104,5 +109,113 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* ——— App-wide style guide (Tek / ServerForm look) ——— */
+@layer components {
+  /* Elevated card: use for form containers, auth cards, modal-style content */
+  .card-elevated {
+    @apply rounded-xl border border-input bg-background-elevated shadow-lg shadow-black/40;
+  }
+
+  /* Single card in carousels/lists — same elevated look, slightly lighter shadow */
+  .card-tek {
+    @apply rounded-xl border border-input bg-background-elevated shadow-md shadow-black/30;
+  }
+
+  /* Standard text input & select — matches ServerForm. Use on <input>, <select>. */
+  .input-tek {
+    @apply w-full p-2 border rounded-md bg-background text-foreground text-sm h-9;
+    @apply border-input/80 hover:border-input shadow-sm;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:border-input;
+  }
+
+  /* Variable-height input (textarea). Use with !h-auto min-h-[4.5rem] etc. as needed. */
+  .input-tek-auto {
+    @apply w-full p-2 border rounded-md bg-background text-foreground text-sm;
+    @apply border-input/80 hover:border-input shadow-sm;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:border-input;
+  }
+
+  /* Form label — use with <label> or <span> above inputs */
+  .label-tek {
+    @apply block text-sm font-medium text-foreground mb-0.5;
+  }
+
+  /* Inline form error / alert — use for validation or API error messages */
+  .form-error {
+    @apply p-2 bg-destructive/20 border border-destructive rounded-md text-destructive text-sm;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Tek panel surface — dark metal with depth */
+  .bg-tek-wall {
+    background-color: hsl(var(--background));
+    background-image:
+      /* top inset shadow */
+      linear-gradient(
+        to bottom,
+        hsl(0 0% 35% / .5),
+        transparent 30%
+      ),
+      /* bottom inset shadow */
+      linear-gradient(
+        to top,
+        hsl(0 0% 28% / .5),
+        transparent 35%
+      ),
+      /* directional energy lighting */
+      linear-gradient(
+        135deg,
+        hsl(var(--ring) / .5),
+        transparent 45%
+      );
+  }
+
+  /* Tek powered border — z-index so it paints above the content layer */
+  .tek-border {
+    position: relative;
+  }
+  .tek-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    pointer-events: none;
+    border: 3px solid hsl(var(--ring) / 0.35);
+    box-shadow:
+      inset 0 0 0 1px hsla(0, 0%, 100%, 0.247),
+      inset 0 0 12px hsl(var(--ring) / 0.12),
+      0 6px 18px hsl(0 0% 0% / 0.45);
+  }
+
+  /* Tek energy seam — z-index so it paints above the content layer */
+  .tek-seam {
+    z-index: 1;
+  }
+  .tek-seam::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      hsl(var(--ring) / 0.6),
+      transparent
+    );
   }
 }

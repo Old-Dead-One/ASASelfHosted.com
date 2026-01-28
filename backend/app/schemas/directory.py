@@ -36,6 +36,9 @@ TriState = Literal["any", "true", "false"]
 # Platform types (known universe for type safety)
 Platform = Literal["steam", "xbox", "playstation", "windows_store", "epic"]
 
+# Hosting provider (internal validation only; not exposed in directory/UI)
+HostingProvider = Literal["self_hosted", "nitrado", "official", "other_managed"]
+
 
 class DirectoryServer(BaseSchema):
     """
@@ -56,9 +59,8 @@ class DirectoryServer(BaseSchema):
     map_name: str | None = None
 
     # Join information
-    # Note: join_password is NOT included in public directory contract
-    # If password handling is needed, use a separate owner-only schema
     join_address: str | None = None
+    join_password: str | None = None  # Server password (public, visible to all players)
     join_instructions_pc: str | None = None
     join_instructions_console: str | None = None
 
@@ -131,9 +133,9 @@ class DirectoryServer(BaseSchema):
     is_new: bool = False
     is_stable: bool = False
 
-    # Classification (mutually exclusive ruleset)
-    # Optional for MVP/manual listings; will be required when classification is guaranteed (Sprint 3+)
-    ruleset: Ruleset | None = None
+    # Classification
+    ruleset: Ruleset | None = None  # Legacy/primary; use rulesets for multi-value
+    rulesets: list[str] = Field(default_factory=list)  # Multi-value: at most one of vanilla/vanilla_qol/modded; boosted optional
     # TODO (Sprint 3+): Remove server_type - fully replaced by ruleset
     server_type: ServerType | None = None  # Deprecated: use ruleset instead
 
@@ -143,7 +145,7 @@ class DirectoryServer(BaseSchema):
     # Platform and feature flags (computed in directory_view)
     platforms: list[Platform] = Field(default_factory=list)
     is_official_plus: bool | None = (
-        None  # Official+ servers (enhanced official-like experience)
+        None  # Vanilla-style setup (vanilla-like experience). "Official" = who owns server; "Vanilla" = how it's set up.
     )
     is_modded: bool | None = None  # Has mods (derived from mod_list)
     is_crossplay: bool | None = None  # Cross-platform support

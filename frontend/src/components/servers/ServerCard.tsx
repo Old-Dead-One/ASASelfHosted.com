@@ -5,6 +5,7 @@
  * Uses DirectoryServer type from directory_view.
  */
 
+import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import type { DirectoryServer } from '@/types'
@@ -18,7 +19,7 @@ export function ServerCard({ server }: ServerCardProps) {
     const favoriteLabel = favoriteCount === 1 ? '1 favorite' : `${favoriteCount} favorites`
 
     return (
-        <div className="bg-card border border-border rounded-lg p-6 hover:border-primary/50 transition-colors flex flex-col h-full">
+        <div className="card-tek p-6 hover:border-primary/40 transition-colors flex flex-col h-full">
             {/* Header */}
             <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex-1 min-w-0">
@@ -49,7 +50,7 @@ export function ServerCard({ server }: ServerCardProps) {
                     </span>
                 )}
                 {server.game_mode && <Badge type={server.game_mode} />}
-                {server.server_type && <Badge type={server.server_type} />}
+                {server.ruleset && <Badge type={server.ruleset} />}
             </div>
 
             {/* Badges */}
@@ -63,15 +64,15 @@ export function ServerCard({ server }: ServerCardProps) {
             <div className="flex-1" />
 
             {/* Footer */}
-            {/* TODO (Phase 1.5+): Make entire card clickable with accessible focus styles once routing exists */}
-            <div className="flex items-center justify-between pt-4 border-t border-border mt-4">
+            <div className="flex items-center justify-between pt-4 border-t border-input/60 mt-4">
                 <div className="text-xs text-muted-foreground">{favoriteLabel}</div>
-                <a
-                    href={`/servers/${server.id}`}
-                    className="text-sm text-primary hover:text-accent font-medium transition-colors"
+                <Link
+                    to={`/servers/${server.id}`}
+                    className="text-sm text-primary hover:text-accent font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring rounded px-1"
+                    aria-label={`View details for ${server.name}`}
                 >
                     View Details →
-                </a>
+                </Link>
             </div>
         </div>
     )

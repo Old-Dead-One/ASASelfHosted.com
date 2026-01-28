@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import jwt
 from jwt import InvalidTokenError
-from jwt.algorithms import RSAAlgorithm
+from jwt.algorithms import RSAAlgorithm, ECAlgorithm
 
 from app.core.config import get_settings
 from app.core.errors import UnauthorizedError
@@ -190,11 +190,19 @@ def _get_public_key_from_jwks(jwks: dict, kid: str) -> Any:
         Public key for verification
 
     Raises:
-        UnauthorizedError if key not found
+        UnauthorizedError if key not found or unsupported key type
     """
     for key in jwks.get("keys", []):
         if key.get("kid") == kid:
-            return RSAAlgorithm.from_jwk(key)
+            kty = key.get("kty", "").upper()
+            if kty == "RSA":
+                return RSAAlgorithm.from_jwk(key)
+            elif kty == "EC":
+                return ECAlgorithm.from_jwk(key)
+            else:
+                raise UnauthorizedError(
+                    f"Unsupported key type '{kty}' for kid '{kid}'. Only RSA and EC keys are supported."
+                )
 
     raise UnauthorizedError(f"JWK with kid '{kid}' not found in JWKS")
 
@@ -215,7 +223,8 @@ def verify_supabase_jwt(token: str) -> UserIdentity:
     This is authentication, not authorization.
     Authorization is handled by RLS policies and server-side checks.
 
-    Uses JWKS (RS256) for signature verification.
+    Uses JWKS (RS256/ES256) for signature verification.
+    Supports both RSA and ECDSA keys.
     Note: Local bypass should use create_local_bypass_user() instead.
     """
     settings = get_settings()
@@ -233,21 +242,35 @@ def verify_supabase_jwt(token: str) -> UserIdentity:
         raise UnauthorizedError("JWKS URL not configured")
 
     try:
-        # Decode header to get key ID (kid)
+        # Decode header to get key ID (kid) and algorithm
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get("kid")
         if not kid:
             raise UnauthorizedError("Token missing key ID (kid)")
 
+        # Get algorithm from token header (default to RS256 for backward compatibility)
+        token_alg = unverified_header.get("alg", "RS256")
+
         # Get JWKS and find the public key
         jwks = _get_jwks_keys(settings.SUPABASE_JWKS_URL)
         public_key = _get_public_key_from_jwks(jwks, kid)
+
+        # Determine allowed algorithms based on token algorithm
+        # Support both RS256 (RSA) and ES256 (ECDSA)
+        allowed_algorithms = []
+        if token_alg in ("RS256", "RS384", "RS512"):
+            allowed_algorithms = ["RS256", "RS384", "RS512"]
+        elif token_alg in ("ES256", "ES384", "ES512"):
+            allowed_algorithms = ["ES256", "ES384", "ES512"]
+        else:
+            # Fallback: try both RSA and EC algorithms
+            allowed_algorithms = ["RS256", "ES256"]
 
         # Verify token signature and claims
         # Let PyJWT enforce issuer/audience (consistent, less drift)
         decode_kwargs: dict[str, Any] = {
             "key": public_key,
-            "algorithms": ["RS256"],
+            "algorithms": allowed_algorithms,
             "options": {"require": ["exp", "sub"]},
         }
 

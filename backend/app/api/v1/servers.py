@@ -15,13 +15,17 @@ If stored later, they will be encrypted and only returned to the server owner.
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
-from app.core.deps import get_optional_user, require_user
+from app.core.deps import extract_bearer_token, get_optional_user, require_user
+from app.core.errors import NotFoundError, UnauthorizedError
 from app.core.security import UserIdentity
+from app.db.providers import get_servers_repo
+from app.db.servers_repo import ServersRepository
 from app.schemas.base import SuccessResponse
 from app.schemas.directory import DirectoryResponse
 from app.schemas.servers import (
+    MyServersResponse,
     ServerCreateRequest,
     ServerOwnerResponse,
     ServerPublicResponse,
@@ -31,47 +35,43 @@ from app.schemas.servers import (
 router = APIRouter(prefix="/servers", tags=["servers"])
 
 
-@router.get("/", response_model=DirectoryResponse)
-async def list_servers(
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(
-        default=50, ge=1, le=100, description="Items per page (max 100)"
-    ),
-    q: str | None = Query(
-        default=None, description="Search query (server name, description)"
-    ),
-    status: Literal["online", "offline", "unknown"] | None = Query(
-        default=None, description="Filter by server status"
-    ),
-    mode: Literal["manual", "verified"] | None = Query(
-        default=None, description="Filter by verification mode"
-    ),
-    user: UserIdentity | None = Depends(get_optional_user),
+@router.get("/", response_model=MyServersResponse)
+async def list_owner_servers(
+    request: Request,
+    user: UserIdentity = Depends(require_user),
 ):
     """
-    List public servers from directory_view.
+    List servers owned by the authenticated user.
 
-    Public endpoint - no authentication required.
-    Returns servers from directory_view (public read model).
-
-    Pagination and filtering are supported.
-    Search, status, and verification mode filters are optional.
+    Requires authentication.
+    Returns all servers owned by the user (different from public directory).
+    Uses page-based pagination format for frontend compatibility.
     """
-    # TODO: Implement server listing from directory_view
-    # TODO: Implement pagination
-    # TODO: Implement filtering (search, status, badges, etc.)
-    # TODO: Use user context for personalized data (favorites, etc.)
+    # Extract JWT token for RLS client
+    token = extract_bearer_token(request)
+    if not token:
+        raise UnauthorizedError("Authentication required")
+    
+    # Get servers repository with RLS client
+    repo = get_servers_repo(token)
+    
+    # List owner's servers
+    servers = await repo.list_owner_servers(user.user_id)
+    
+    # Frontend expects page-based format for owner's servers (different from directory)
+    # Match the MyServersResponse interface: { data, total, page, page_size }
     return {
-        "data": [],
-        "total": 0,
-        "page": page,
-        "page_size": page_size,
+        "data": list(servers),
+        "total": len(servers),
+        "page": 1,
+        "page_size": len(servers),
     }
 
 
 @router.get("/{server_id}", response_model=ServerPublicResponse)
 async def get_server(
     server_id: str,
+    request: Request,
     user: UserIdentity | None = Depends(get_optional_user),
 ):
     """
@@ -80,17 +80,25 @@ async def get_server(
     Public endpoint - returns server if it's public.
     If user is authenticated and owns the server, returns owner view.
     """
-    # TODO: Implement server retrieval
-    # TODO: Check if server is public or user has permission
-    # TODO: Return owner view if user owns the server
-    from app.core.errors import NotFoundError
-
+    # For public access, use directory endpoint instead
+    # This endpoint is for owner-specific server retrieval
+    # If user is authenticated, use RLS client
+    if user:
+        token = extract_bearer_token(request)
+        if token:
+            repo = get_servers_repo(token)
+            server = await repo.get_server(server_id, user.user_id)
+            if server:
+                return server
+    
+    # Fallback: server not found or user not authenticated
     raise NotFoundError("server", server_id)
 
 
 @router.post("/", response_model=ServerOwnerResponse)
 async def create_server(
     server_data: ServerCreateRequest,
+    request: Request,
     user: UserIdentity = Depends(require_user),
 ):
     """
@@ -99,19 +107,24 @@ async def create_server(
     Requires authentication.
     Creates a server owned by the authenticated user.
     """
-    # TODO: Implement server creation
-    # TODO: Set owner_user_id to user.id
-    # TODO: Validate server data
-    # TODO: Insert into servers table
-    from app.core.errors import DomainValidationError
-
-    raise DomainValidationError("Server creation not yet implemented")
+    # Extract JWT token for RLS client
+    token = extract_bearer_token(request)
+    if not token:
+        raise UnauthorizedError("Authentication required")
+    
+    # Get servers repository with RLS client
+    repo = get_servers_repo(token)
+    
+    # Create server
+    server = await repo.create_server(user.user_id, server_data)
+    return server
 
 
 @router.put("/{server_id}", response_model=ServerOwnerResponse)
 async def update_server(
     server_id: str,
     server_data: ServerUpdateRequest,
+    request: Request,
     user: UserIdentity = Depends(require_user),
 ):
     """
@@ -120,17 +133,26 @@ async def update_server(
     Requires authentication and ownership.
     Only the server owner can update their server.
     """
-    # TODO: Implement server update
-    # TODO: Verify user owns the server
-    # TODO: Update server fields
-    from app.core.errors import DomainValidationError
-
-    raise DomainValidationError("Server update not yet implemented")
+    # Extract JWT token for RLS client
+    token = extract_bearer_token(request)
+    if not token:
+        raise UnauthorizedError("Authentication required")
+    
+    # Get servers repository with RLS client
+    repo = get_servers_repo(token)
+    
+    # Update server
+    server = await repo.update_server(server_id, user.user_id, server_data)
+    if not server:
+        raise NotFoundError("server", server_id)
+    
+    return server
 
 
 @router.delete("/{server_id}", response_model=SuccessResponse)
 async def delete_server(
     server_id: str,
+    request: Request,
     user: UserIdentity = Depends(require_user),
 ):
     """
@@ -139,7 +161,17 @@ async def delete_server(
     Requires authentication and ownership.
     Only the server owner can delete their server.
     """
-    # TODO: Implement server deletion
-    # TODO: Verify user owns the server
-    # TODO: Soft delete or hard delete based on requirements
+    # Extract JWT token for RLS client
+    token = extract_bearer_token(request)
+    if not token:
+        raise UnauthorizedError("Authentication required")
+    
+    # Get servers repository with RLS client
+    repo = get_servers_repo(token)
+    
+    # Delete server
+    deleted = await repo.delete_server(server_id, user.user_id)
+    if not deleted:
+        raise NotFoundError("server", server_id)
+    
     return {"success": True}
