@@ -65,6 +65,7 @@ function formDataToCreatePayload(data: ServerFormData): Record<string, unknown> 
         ? data.mod_list.split(',').map((m) => m.trim()).filter((m) => m.length > 0)
         : null
     const platformFlags = platformToFlags(data.platform)
+    const joinInstructions = data.join_instructions?.trim() || null
     const body: Record<string, unknown> = {
         name: data.name.trim(),
         description: data.description?.trim() || null,
@@ -72,8 +73,8 @@ function formDataToCreatePayload(data: ServerFormData): Record<string, unknown> 
         map_name: data.map_name?.trim() || null,
         join_address: data.join_address?.trim() || null,
         join_password: data.join_password?.trim() || null,
-        join_instructions_pc: data.join_instructions_pc?.trim() || null,
-        join_instructions_console: data.join_instructions_console?.trim() || null,
+        join_instructions_pc: joinInstructions,
+        join_instructions_console: joinInstructions,
         mod_list: modList && modList.length > 0 ? modList : null,
         rates: data.rates?.trim() || null,
         wipe_info: data.wipe_info?.trim() || null,
@@ -94,6 +95,7 @@ function formDataToUpdatePayload(data: ServerFormData): Record<string, unknown> 
         ? data.mod_list.split(',').map((m) => m.trim()).filter((m) => m.length > 0)
         : null
     const platformFlags = platformToFlags(data.platform)
+    const joinInstructions = data.join_instructions?.trim() || null
     const body: Record<string, unknown> = {
         name: data.name.trim(),
         description: data.description?.trim() || null,
@@ -101,8 +103,8 @@ function formDataToUpdatePayload(data: ServerFormData): Record<string, unknown> 
         map_name: data.map_name?.trim() || null,
         join_address: data.join_address?.trim() || null,
         join_password: data.join_password?.trim() || null,
-        join_instructions_pc: data.join_instructions_pc?.trim() || null,
-        join_instructions_console: data.join_instructions_console?.trim() || null,
+        join_instructions_pc: joinInstructions,
+        join_instructions_console: joinInstructions,
         mod_list: modList && modList.length > 0 ? modList : null,
         rates: data.rates?.trim() || null,
         wipe_info: data.wipe_info?.trim() || null,
@@ -118,7 +120,7 @@ function formDataToUpdatePayload(data: ServerFormData): Record<string, unknown> 
     return body
 }
 
-function serverToFormData(s: DashboardServer): Partial<ServerFormData> {
+function serverToFormData(s: DashboardServer, excludeNameAddressAndMap = false): Partial<ServerFormData> {
     const modListString = s.mod_list && s.mod_list.length > 0 ? s.mod_list.join(', ') : ''
     const rulesets = (s as { rulesets?: string[] }).rulesets && (s as { rulesets?: string[] }).rulesets!.length > 0
         ? (s as { rulesets: string[] }).rulesets
@@ -130,13 +132,12 @@ function serverToFormData(s: DashboardServer): Partial<ServerFormData> {
 
     return {
         is_self_hosted_confirmed: true,
-        name: s.name,
+        name: excludeNameAddressAndMap ? '' : s.name,
         description: s.description ?? '',
-        map_name: s.map_name ?? '',
-        join_address: s.join_address ?? '',
+        map_name: excludeNameAddressAndMap ? '' : (s.map_name ?? ''),
+        join_address: excludeNameAddressAndMap ? '' : (s.join_address ?? ''),
         join_password: s.join_password ?? '',
-        join_instructions_pc: s.join_instructions_pc ?? '',
-        join_instructions_console: s.join_instructions_console ?? '',
+        join_instructions: s.join_instructions_pc || s.join_instructions_console || '',
         mod_list: modListString,
         rates: s.rates ?? '',
         wipe_info: s.wipe_info ?? '',
@@ -156,11 +157,12 @@ export function DashboardPage() {
 
     const [showCreateForm, setShowCreateForm] = useState(false)
     const [editingServer, setEditingServer] = useState<DashboardServer | null>(null)
+    const [cloningServer, setCloningServer] = useState<DashboardServer | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<DashboardServer | null>(null)
     const [crudError, setCrudError] = useState<string | null>(null)
 
     const servers = (myServers?.data ?? []) as DashboardServer[]
-    const showList = !showCreateForm && !editingServer
+    const showList = !showCreateForm && !editingServer && !cloningServer
 
     // Check if error is due to authentication (user is logged in but token invalid)
     const isAuthError = error instanceof Error && (
@@ -176,6 +178,7 @@ export function DashboardPage() {
                 await createServer(formDataToCreatePayload(data))
                 invalidate()
                 setShowCreateForm(false)
+                setCloningServer(null)
             } catch (err) {
                 if (isNotImplementedError(err)) {
                     setCrudError(
@@ -233,6 +236,7 @@ export function DashboardPage() {
                 await deleteServer(server.id)
                 invalidate()
                 setDeleteConfirm(null)
+                setEditingServer(null)
             } catch (err) {
                 if (isNotImplementedError(err)) {
                     setCrudError(
@@ -254,19 +258,29 @@ export function DashboardPage() {
         [invalidate]
     )
 
+    const handleCloneServer = useCallback(
+        (server: DashboardServer) => {
+            setCrudError(null)
+            setEditingServer(null)
+            setCloningServer(server)
+            setShowCreateForm(true)
+        },
+        []
+    )
+
     return (
         <div className="py-8">
-            <div className="mb-4">
-                <div className="mb-2">
-                    <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-                </div>
-                <p className="text-muted-foreground">
-                    Welcome back, {user?.email ?? 'User'}. <br /> Manage your servers here.
+            <div className="mb-4 text-center">
+                <h1 className="text-4xl font-bold text-foreground">
+                    Dashboard
+                </h1>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                    Welcome back, {user?.email ?? 'User'}.
                 </p>
             </div>
 
             {crudError && (
-                <div className="mb-6">
+                <div className="mb-4">
                     <ErrorMessage
                         error={new Error(crudError)}
                         title="Action unavailable"
@@ -287,16 +301,19 @@ export function DashboardPage() {
             {showCreateForm && (
                 <div className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 mb-8">
                     <h2 className="text-xl font-semibold text-foreground mb-2">
-                        Create New Server
+                        {cloningServer ? 'Clone Server' : 'Create New Server'}
                     </h2>
-                    <p className="text-sm text-muted-foreground mb-6">
-                        Only name and description are saved for now. More fields when the backend
-                        supports them.
-                    </p>
+                    {cloningServer && (
+                        <p className="text-sm text-muted-foreground mb-4">
+                            Cloning from &quot;{cloningServer.name}&quot;. Please provide a new server name, map name, and join address.
+                        </p>
+                    )}
                     <ServerForm
+                        initialData={cloningServer ? serverToFormData(cloningServer, true) : undefined}
                         onSubmit={handleCreateServer}
                         onCancel={() => {
                             setShowCreateForm(false)
+                            setCloningServer(null)
                             setCrudError(null)
                         }}
                     />
@@ -304,8 +321,8 @@ export function DashboardPage() {
             )}
 
             {editingServer && (
-                <div className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 mb-8">
-                    <h2 className="text-xl font-semibold text-foreground mb-6">
+                <div className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40">
+                    <h2 className="text-xl font-semibold text-foreground mb-4">
                         Edit Server
                     </h2>
                     <ServerForm
@@ -315,6 +332,7 @@ export function DashboardPage() {
                             setEditingServer(null)
                             setCrudError(null)
                         }}
+                        onDelete={() => setDeleteConfirm(editingServer)}
                         submitLabel="Save Changes"
                     />
                 </div>
@@ -363,9 +381,12 @@ export function DashboardPage() {
                             <div className="-mx-4">
                                 <DashboardServersCarousel
                                     servers={servers}
-                                    onAddServer={() => setShowCreateForm(true)}
+                                    onAddServer={() => {
+                                        setCloningServer(null)
+                                        setShowCreateForm(true)
+                                    }}
                                     onEdit={setEditingServer}
-                                    onDelete={setDeleteConfirm}
+                                    onClone={handleCloneServer}
                                 />
                             </div>
                         </>
@@ -413,21 +434,21 @@ export function DashboardPage() {
             )}
 
             <section
-                className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 mt-8"
+                className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 mt-4"
                 aria-labelledby="agent-setup-heading"
             >
                 <h2 id="agent-setup-heading" className="text-xl font-semibold text-foreground mb-4">
                     Agent verification setup
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                    To get verified status and automatic updates, use the local-host agent (or ASA
+                    To verify your server and auto-update your server status, use the local-host agent (or ASA
                     Server API plugin) to send heartbeats:
                 </p>
                 <ol className="list-decimal list-inside space-y-2 text-muted-foreground mb-4">
-                    <li>Install the ASA Server API plugin (or run the local-host agent) on your server.</li>
+                    <li>Install the ASA Server API plugin or run the local-host agent on your server.</li>
                     <li>Generate an Ed25519 key pair (public + private).</li>
-                    <li>Add your public key to this server’s listing (coming in a later update).</li>
-                    <li>Configure the agent to send heartbeats to the API with signatures.</li>
+                    <li>Add your public key to this server’s listing.</li>
+                    <li>Configure the plugin or agent to send heartbeats to ASASelfHosted.com with your private key.</li>
                 </ol>
                 <p className="text-sm text-muted-foreground">
                     Status can be set manually above until agent verification is connected. Detailed

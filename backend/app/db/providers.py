@@ -12,12 +12,14 @@ from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
+from app.db.mods_catalog_repo import ModsCatalogRepository
 from app.db.servers_derived_repo import ServersDerivedRepository
 from app.db.servers_repo import ServersRepository
 from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRepository
 from app.db.supabase_directory_repo import SupabaseDirectoryRepository
 from app.db.supabase_heartbeat_jobs_repo import SupabaseHeartbeatJobsRepository
 from app.db.supabase_heartbeat_repo import SupabaseHeartbeatRepository
+from app.db.supabase_mods_catalog_repo import SupabaseModsCatalogRepository
 from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepository
 from app.db.supabase_servers_repo import SupabaseServersRepository
 
@@ -204,3 +206,19 @@ def get_servers_repo(user_jwt: str) -> ServersRepository:
         SupabaseServersRepository with RLS client configured
     """
     return SupabaseServersRepository(user_jwt)
+
+
+# Mods catalog repository instance (stateless, safe to share)
+_mods_catalog_repo: ModsCatalogRepository | None = None
+
+
+def get_mods_catalog_repo() -> ModsCatalogRepository:
+    """
+    Mods catalog repository provider.
+
+    Returns SupabaseModsCatalogRepository (requires service_role key).
+    """
+    global _mods_catalog_repo
+    if _mods_catalog_repo is None:
+        _mods_catalog_repo = SupabaseModsCatalogRepository()
+    return _mods_catalog_repo

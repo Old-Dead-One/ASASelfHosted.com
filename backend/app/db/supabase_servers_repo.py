@@ -74,8 +74,9 @@ class SupabaseServersRepository(ServersRepository):
         # Classification
         if server_data.game_mode:
             insert_data["game_mode"] = server_data.game_mode
-        if server_data.rulesets:
-            insert_data["rulesets"] = server_data.rulesets
+        # Database only has ruleset (singular), not rulesets (plural)
+        # If rulesets array provided, use first element; otherwise use ruleset directly
+        if server_data.rulesets and len(server_data.rulesets) > 0:
             insert_data["ruleset"] = server_data.rulesets[0]  # Primary for legacy/filters
         elif server_data.ruleset:
             insert_data["ruleset"] = server_data.ruleset
@@ -353,9 +354,13 @@ class SupabaseServersRepository(ServersRepository):
         # Classification
         if server_data.game_mode is not None:
             update_data["game_mode"] = server_data.game_mode
+        # Database only has ruleset (singular), not rulesets (plural)
+        # If rulesets array provided, use first element; otherwise use ruleset directly
         if server_data.rulesets is not None:
-            update_data["rulesets"] = server_data.rulesets
-            update_data["ruleset"] = server_data.rulesets[0] if server_data.rulesets else None
+            if len(server_data.rulesets) > 0:
+                update_data["ruleset"] = server_data.rulesets[0]
+            else:
+                update_data["ruleset"] = None
         elif server_data.ruleset is not None:
             update_data["ruleset"] = server_data.ruleset
         if server_data.effective_status is not None:

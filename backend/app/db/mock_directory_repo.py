@@ -484,6 +484,7 @@ class MockDirectoryRepository(DirectoryRepository):
         crossplay: TriState = "any",
         console: TriState = "any",
         pc: TriState = "any",  # PC support filter (canonical name)
+        is_cluster: TriState = "any",  # Filter by cluster association (true = has cluster, false = no cluster)
         maps: list[str] | None = None,  # Multi-select map names (OR)
         mods: list[str] | None = None,
         platforms: list[Platform] | None = None,  # Multi-select platforms (OR)
@@ -648,6 +649,13 @@ class MockDirectoryRepository(DirectoryRepository):
             # Tri-state: unknown (None) does not match true or false
             servers = [s for s in servers if s.is_pc is not None and s.is_pc == pc_val]
 
+        is_cluster_val = _normalize_tristate(is_cluster)
+        if is_cluster_val is not None:
+            if is_cluster_val:
+                servers = [s for s in servers if s.cluster_id is not None]
+            else:
+                servers = [s for s in servers if s.cluster_id is None]
+
         # Apply multi-select filters (OR semantics)
         if maps:
             maps_set = {m.lower() for m in maps}
@@ -808,6 +816,67 @@ class MockDirectoryRepository(DirectoryRepository):
             next_cursor = create_cursor(rank_by, order, last_sort_value, last_server.id)
 
         return results, next_cursor
+
+    async def count_servers(
+        self,
+        q: str | None = None,
+        status: ServerStatus | None = None,
+        mode: VerificationMode | None = None,
+        ruleset: Ruleset | None = None,
+        game_mode: GameMode | None = None,
+        server_type: ServerType | None = None,
+        map_name: str | None = None,
+        cluster: str | None = None,
+        cluster_visibility: ClusterVisibility | None = None,
+        cluster_id: str | None = None,
+        players_current_min: int | None = None,
+        players_current_max: int | None = None,
+        uptime_min: float | None = None,
+        quality_min: float | None = None,
+        official_plus: TriState = "any",
+        modded: TriState = "any",
+        crossplay: TriState = "any",
+        console: TriState = "any",
+        pc: TriState = "any",
+        is_cluster: TriState = "any",
+        maps: list[str] | None = None,
+        mods: list[str] | None = None,
+        platforms: list[Platform] | None = None,
+    ) -> int:
+        """Return total number of servers matching the given filters."""
+        now_utc = datetime.now(timezone.utc)
+        servers, _ = await self.list_servers(
+            limit=9999,
+            cursor=None,
+            q=q,
+            status=status,
+            mode=mode,
+            rank_by="updated",
+            order="desc",
+            view="card",
+            ruleset=ruleset,
+            game_mode=game_mode,
+            server_type=server_type,
+            map_name=map_name,
+            cluster=cluster,
+            cluster_visibility=cluster_visibility,
+            cluster_id=cluster_id,
+            players_current_min=players_current_min,
+            players_current_max=players_current_max,
+            uptime_min=uptime_min,
+            quality_min=quality_min,
+            official_plus=official_plus,
+            modded=modded,
+            crossplay=crossplay,
+            console=console,
+            pc=pc,
+            is_cluster=is_cluster,
+            maps=maps,
+            mods=mods,
+            platforms=platforms,
+            now_utc=now_utc,
+        )
+        return len(servers)
 
     async def get_filters(self) -> DirectoryFiltersResponse:
         """

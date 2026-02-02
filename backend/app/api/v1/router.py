@@ -16,6 +16,7 @@ from app.api.v1 import (
     directory,
     favorites,
     heartbeat,
+    mods,
     servers,
     subscriptions,
     verification,
@@ -36,6 +37,7 @@ router.include_router(clusters.router)
 router.include_router(verification.router)
 router.include_router(heartbeat.router)
 router.include_router(consent.router)
+router.include_router(mods.router)
 router.include_router(subscriptions.router)
 router.include_router(webhooks.router)
 

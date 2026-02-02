@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { FavoriteButton } from '@/components/servers/FavoriteButton'
 import { ErrorMessage } from '@/components/ui/ErrorMessage'
+import { resolveMods, type ResolvedMod } from '@/lib/api'
 
 // Padding size system: xs, sm (default), md, lg, xl, xxl
 // xs: p-2 (8px), sm: p-3 (12px), md: p-4 (16px), lg: p-6 (24px), xl: p-8 (32px), xxl: p-12 (48px)
@@ -75,7 +76,7 @@ function CopyableAddress({
 
     return (
         <div className={className}>
-            <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center justify-between gap-2">
                 <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
                 <button
                     type="button"
@@ -97,6 +98,47 @@ function CopyableAddress({
 export function ServerPage() {
     const { serverId } = useParams<{ serverId: string }>()
     const { data: server, isLoading, error } = useServer(serverId || '')
+    const [resolvedMods, setResolvedMods] = useState<Map<number, ResolvedMod>>(new Map())
+    const [resolvingMods, setResolvingMods] = useState(false)
+
+    // Resolve mod IDs to names when server data loads
+    useEffect(() => {
+        if (!server?.mod_list || server.mod_list.length === 0) {
+            setResolvedMods(new Map())
+            return
+        }
+
+        // Parse mod IDs from string array
+        const modIds = server.mod_list
+            .map((id) => {
+                const parsed = parseInt(id.trim(), 10)
+                return isNaN(parsed) || parsed <= 0 ? null : parsed
+            })
+            .filter((id): id is number => id !== null)
+
+        if (modIds.length === 0) {
+            setResolvedMods(new Map())
+            return
+        }
+
+        // Resolve mod IDs to names
+        setResolvingMods(true)
+        resolveMods(modIds)
+            .then((response) => {
+                const modMap = new Map<number, ResolvedMod>()
+                response.data.forEach((mod) => {
+                    modMap.set(mod.mod_id, mod)
+                })
+                setResolvedMods(modMap)
+            })
+            .catch(() => {
+                // Silently fail - mods will just show as IDs
+                setResolvedMods(new Map())
+            })
+            .finally(() => {
+                setResolvingMods(false)
+            })
+    }, [server?.mod_list])
 
     if (!serverId) {
         return <Navigate to="/404" replace />
@@ -201,16 +243,14 @@ export function ServerPage() {
                             </p>
                         )}
                     </div>
-                    <StatusBadge status={server.effective_status ?? 'unknown'} />
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-2">
-                    {server.is_verified && <Badge type="verified" />}
-                    {server.is_new && <Badge type="new" />}
-                    {server.is_stable && <Badge type="stable" />}
-                    {server.game_mode && <Badge type={server.game_mode} />}
-                    {server.ruleset && <Badge type={server.ruleset} />}
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <StatusBadge status={server.effective_status ?? 'unknown'} />
+                        {server.is_verified && <Badge type="verified" />}
+                        {server.is_new && <Badge type="new" />}
+                        {server.is_stable && <Badge type="stable" />}
+                        {server.game_mode && <Badge type={server.game_mode} />}
+                        {server.ruleset && <Badge type={server.ruleset} />}
+                    </div>
                 </div>
 
                 {server.description && (
@@ -220,387 +260,344 @@ export function ServerPage() {
 
             {/* Two-column card grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                    <h2 className="text-base font-semibold text-foreground mb-2">Server Details</h2>
-                    <dl className="space-y-1">
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Server ID</dt>
-                            <dd className="text-sm text-foreground font-mono text-xs break-all">
-                                {server.id}
-                            </dd>
-                        </div>
-                        {server.map_name ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Map</dt>
-                                <dd className="text-sm text-foreground font-mono">
-                                    {server.map_name}
-                                </dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Map</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                            </>
-                        )}
-                        {server.players_current !== null || server.players_capacity !== null ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Players
-                                </dt>
-                                <dd className="text-sm text-foreground">
-                                    {server.players_current !== null ? server.players_current : '?'}
-                                    {server.players_capacity !== null &&
-                                        ` / ${server.players_capacity}`}
-                                </dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Players
-                                </dt>
-                                <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                            </>
-                        )}
-                        {server.uptime_percent !== null ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Uptime (24h)
-                                </dt>
-                                <dd className="text-sm text-foreground">
-                                    {server.uptime_percent.toFixed(1)}%
-                                </dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Uptime (24h)
-                                </dt>
-                                <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                            </>
-                        )}
-                        {server.quality_score !== null ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Quality Score
-                                </dt>
-                                <dd className="text-sm text-foreground">
-                                    {server.quality_score.toFixed(1)}
-                                </dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">
-                                    Quality Score
-                                </dt>
-                                <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                            </>
-                        )}
-                    </dl>
-                </div>
-
-                {(server.join_address || server.join_password || server.join_instructions_pc || server.join_instructions_console) && (
-                    <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                        <h2 className="text-base font-semibold text-foreground mb-2">
-                            Join Instructions
-                        </h2>
-                        {server.join_address && (
-                            <div className="mb-2">
-                                <CopyableAddress value={server.join_address} label="Server Address" />
-                            </div>
-                        )}
-                        {server.join_password && (
-                            <div className="mb-2">
-                                <CopyableAddress value={server.join_password} label="Join Password" />
-                            </div>
-                        )}
-                        {server.join_instructions_pc && (
-                            <div className="mb-2">
-                                <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                    PC Instructions
-                                </dt>
-                                <dd className="text-sm text-foreground whitespace-pre-line">
-                                    {server.join_instructions_pc}
-                                </dd>
-                            </div>
-                        )}
-                        {server.join_instructions_console && (
+                <div className="relative overflow-hidden rounded-lg tek-border">
+                    <div className="absolute inset-0 bg-tek-wall" aria-hidden />
+                    <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
+                    <div className={`relative ${CARD_PADDING} bg-background/65 backdrop-blur-[1px] flex flex-col h-full`}>
+                        <h2 className="text-base font-semibold text-foreground mb-2">Server Details</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr] gap-4 flex-1 min-h-0">
                             <div>
-                                <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                    Console Instructions
-                                </dt>
-                                <dd className="text-sm text-foreground whitespace-pre-line">
-                                    {server.join_instructions_console}
-                                </dd>
+                                <dl className="space-y-1">
+                                    {server.map_name ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Map</dt>
+                                            <dd className="text-sm text-foreground font-mono">
+                                                {server.map_name}
+                                            </dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Map</dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                        </>
+                                    )}
+                                    {server.players_current !== null || server.players_capacity !== null ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Players
+                                            </dt>
+                                            <dd className="text-sm text-foreground">
+                                                {server.players_current !== null ? server.players_current : '?'}
+                                                {server.players_capacity !== null &&
+                                                    ` / ${server.players_capacity}`}
+                                            </dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Players
+                                            </dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                        </>
+                                    )}
+                                    {server.uptime_percent !== null ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Uptime (24h)
+                                            </dt>
+                                            <dd className="text-sm text-foreground">
+                                                {server.uptime_percent.toFixed(1)}%
+                                            </dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Uptime (24h)
+                                            </dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                        </>
+                                    )}
+                                    {server.quality_score !== null ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Quality Score
+                                            </dt>
+                                            <dd className="text-sm text-foreground">
+                                                {server.quality_score.toFixed(1)}
+                                            </dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Quality Score
+                                            </dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                        </>
+                                    )}
+                                    {server.rates ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Rates</dt>
+                                            <dd className="text-sm text-foreground">{server.rates}</dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Rates</dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                        </>
+                                    )}
+                                    {server.wipe_info ? (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Wipe Info</dt>
+                                            <dd className="text-sm text-foreground whitespace-pre-line">
+                                                {server.wipe_info}
+                                            </dd>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <dt className="text-sm font-medium text-muted-foreground">Wipe Info</dt>
+                                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                        </>
+                                    )}
+                                    <div>
+                                        <dt className="text-sm font-medium text-muted-foreground">Created At</dt>
+                                        <dd className="text-sm text-foreground">
+                                            {new Date(server.created_at).toLocaleString()}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-sm font-medium text-muted-foreground">Updated At</dt>
+                                        <dd className="text-sm text-foreground">
+                                            {new Date(server.updated_at).toLocaleString()}
+                                        </dd>
+                                    </div>
+                                </dl>
                             </div>
-                        )}
+                            <div className="flex flex-col min-h-0 max-h-full">
+                                <h3 className="text-sm font-semibold text-foreground mb-2">
+                                    Mod List
+                                    {resolvingMods && (
+                                        <span className="ml-2 text-xs text-muted-foreground">(resolving...)</span>
+                                    )}
+                                </h3>
+                                <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-full">
+                                    {server.mod_list && server.mod_list.length > 0 ? (
+                                        <ul className="list-disc list-inside space-y-1">
+                                            {server.mod_list.map((modStr, idx) => {
+                                                const modId = parseInt(modStr.trim(), 10)
+                                                const resolvedMod = !isNaN(modId) && modId > 0 ? resolvedMods.get(modId) : null
+
+                                                return (
+                                                    <li key={idx} className="text-xs text-foreground font-mono whitespace-nowrap">
+                                                        {resolvedMod ? resolvedMod.name : modStr}
+                                                    </li>
+                                                )
+                                            })}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground italic">No mods listed</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {(server.join_address || server.join_password || server.join_instructions_pc || server.join_instructions_console || server.is_pc !== null || server.is_console !== null || server.is_crossplay !== null) && (
+                    <div className="relative overflow-hidden rounded-lg tek-border">
+                        <div className="absolute inset-0 bg-tek-wall" aria-hidden />
+                        <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
+                        <div className={`relative ${CARD_PADDING} bg-background/65 backdrop-blur-[1px]`}>
+                            <h2 className="text-base font-semibold text-foreground mb-2">
+                                Join Instructions
+                            </h2>
+                            {(server.is_pc !== null || server.is_console !== null || server.is_crossplay !== null) && (
+                                <div className="mb-2">
+                                    <dt className="text-sm font-medium text-muted-foreground mb-1">Platform</dt>
+                                    <dd className="text-sm text-foreground">
+                                        {(() => {
+                                            // Determine platform display: PC Only, Console Only, or Crossplay
+                                            if (server.is_pc && server.is_console) {
+                                                return 'Crossplay'
+                                            } else if (server.is_pc) {
+                                                return 'PC Only'
+                                            } else if (server.is_console) {
+                                                return 'Console Only'
+                                            } else {
+                                                return 'Not specified'
+                                            }
+                                        })()}
+                                    </dd>
+                                </div>
+                            )}
+                            {server.join_address && (
+                                <div className="mb-2">
+                                    <CopyableAddress value={server.join_address} label="Server Address" />
+                                </div>
+                            )}
+                            {server.join_password && (
+                                <div className="mb-2">
+                                    <CopyableAddress value={server.join_password} label="Join Password" />
+                                </div>
+                            )}
+                            {(server.join_instructions_pc || server.join_instructions_console) && (
+                                <div>
+                                    <dt className="text-sm font-medium text-muted-foreground mb-1">
+                                        Join Instructions
+                                    </dt>
+                                    <dd className="text-sm text-foreground whitespace-pre-line">
+                                        {server.join_instructions_pc || server.join_instructions_console}
+                                    </dd>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
-            {/* Mod List */}
-            <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                <h2 className="text-base font-semibold text-foreground mb-2">Mods</h2>
-                {server.mod_list && server.mod_list.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-1">
-                        {server.mod_list.map((mod, idx) => (
-                            <li key={idx} className="text-sm text-foreground font-mono">
-                                {mod}
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-sm text-muted-foreground italic">No mods listed</p>
+                {/* Status & Monitoring */}
+                <div className="relative overflow-hidden rounded-lg tek-border">
+                    <div className="absolute inset-0 bg-tek-wall" aria-hidden />
+                    <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
+                    <div className={`relative ${CARD_PADDING} bg-background/65 backdrop-blur-[1px]`}>
+                        <h2 className="text-base font-semibold text-foreground mb-2">Monitoring</h2>
+                        <dl className="space-y-1">
+                            {server.status_source ? (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Source</dt>
+                                    <dd className="text-sm text-foreground capitalize">{server.status_source}</dd>
+                                </>
+                            ) : (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Source</dt>
+                                    <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                </>
+                            )}
+                            {server.confidence ? (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Confidence</dt>
+                                    <dd className="text-sm text-foreground capitalize">{server.confidence}</dd>
+                                </>
+                            ) : (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Confidence</dt>
+                                    <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                </>
+                            )}
+                            {server.last_seen_at ? (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Last Update</dt>
+                                    <dd className="text-sm text-foreground">
+                                        {new Date(server.last_seen_at).toLocaleString()}
+                                    </dd>
+                                </>
+                            ) : (
+                                <>
+                                    <dt className="text-sm font-medium text-muted-foreground">Last Update</dt>
+                                    <dd className="text-sm text-muted-foreground italic">Never</dd>
+                                </>
+                            )}
+                        </dl>
+                    </div>
+                </div>
+
+                {/* Ranking */}
+                {(server.rank_position !== null || server.rank_by !== null || server.rank_delta_24h !== null) && (
+                    <div className="relative overflow-hidden rounded-lg tek-border">
+                        <div className="absolute inset-0 bg-tek-wall" aria-hidden />
+                        <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
+                        <div className={`relative ${CARD_PADDING} bg-background/65 backdrop-blur-[1px]`}>
+                            <h2 className="text-base font-semibold text-foreground mb-2">Ranking</h2>
+                            <dl className="space-y-1">
+                                {server.rank_position !== null ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Rank Position</dt>
+                                        <dd className="text-sm text-foreground">#{server.rank_position}</dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Rank Position</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not ranked</dd>
+                                    </>
+                                )}
+                                {server.rank_by ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Ranked By</dt>
+                                        <dd className="text-sm text-foreground capitalize">{server.rank_by}</dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Ranked By</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                    </>
+                                )}
+                                {server.rank_delta_24h !== null ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Rank Change (24h)</dt>
+                                        <dd className={`text-sm ${server.rank_delta_24h > 0 ? 'text-green-500' : server.rank_delta_24h < 0 ? 'text-red-500' : ''}`}>
+                                            {server.rank_delta_24h > 0 ? '+' : ''}{server.rank_delta_24h}
+                                        </dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Rank Change (24h)</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not available</dd>
+                                    </>
+                                )}
+                            </dl>
+                        </div>
+                    </div>
                 )}
-            </div>
 
-            {/* Additional Info */}
-            <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                <h2 className="text-base font-semibold text-foreground mb-2">
-                    Additional Information
-                </h2>
-                <dl className="space-y-2">
-                    {server.rates ? (
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                Rates
-                            </dt>
-                            <dd className="text-sm text-foreground">{server.rates}</dd>
-                        </div>
-                    ) : (
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                Rates
-                            </dt>
-                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                        </div>
-                    )}
-                    {server.wipe_info ? (
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                Wipe Info
-                            </dt>
-                            <dd className="text-sm text-foreground whitespace-pre-line">
-                                {server.wipe_info}
-                            </dd>
-                        </div>
-                    ) : (
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground mb-1">
-                                Wipe Info
-                            </dt>
-                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                        </div>
-                    )}
-                </dl>
-            </div>
-
-            {/* Platform & Features */}
-            <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                <h2 className="text-base font-semibold text-foreground mb-2">Platform & Features</h2>
-                <dl className="space-y-1">
-                    {server.platforms && server.platforms.length > 0 ? (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Platforms</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.platforms.join(', ')}
-                            </dd>
-                        </>
-                    ) : (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Platforms</dt>
-                            <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                        </>
-                    )}
-                    <div className="grid grid-cols-2 gap-2 mt-4">
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">PC Support</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.is_pc !== null ? (server.is_pc ? 'Yes' : 'No') : 'Unknown'}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Console Support</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.is_console !== null ? (server.is_console ? 'Yes' : 'No') : 'Unknown'}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Crossplay</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.is_crossplay !== null ? (server.is_crossplay ? 'Yes' : 'No') : 'Unknown'}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Modded</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.is_modded !== null ? (server.is_modded ? 'Yes' : 'No') : 'Unknown'}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Vanilla-style</dt>
-                            <dd className="text-sm text-foreground">
-                                {server.is_official_plus !== null ? (server.is_official_plus ? 'Yes' : 'No') : 'Unknown'}
-                            </dd>
+                {/* Cluster Info */}
+                {server.cluster_id && (
+                    <div className="relative overflow-hidden rounded-lg tek-border">
+                        <div className="absolute inset-0 bg-tek-wall" aria-hidden />
+                        <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
+                        <div className={`relative ${CARD_PADDING} bg-background/65 backdrop-blur-[1px]`}>
+                            <h2 className="text-base font-semibold text-foreground mb-2">Cluster Information</h2>
+                            <dl className="space-y-1">
+                                <div>
+                                    <dt className="text-sm font-medium text-muted-foreground">Cluster ID</dt>
+                                    <dd className="text-sm text-foreground font-mono text-xs break-all">
+                                        {server.cluster_id}
+                                    </dd>
+                                </div>
+                                {server.cluster_name ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Name</dt>
+                                        <dd className="text-sm text-foreground">{server.cluster_name}</dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Name</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                    </>
+                                )}
+                                {server.cluster_slug ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Slug</dt>
+                                        <dd className="text-sm text-foreground font-mono">{server.cluster_slug}</dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Slug</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                    </>
+                                )}
+                                {server.cluster_visibility ? (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Visibility</dt>
+                                        <dd className="text-sm text-foreground capitalize">{server.cluster_visibility}</dd>
+                                    </>
+                                ) : (
+                                    <>
+                                        <dt className="text-sm font-medium text-muted-foreground">Cluster Visibility</dt>
+                                        <dd className="text-sm text-muted-foreground italic">Not specified</dd>
+                                    </>
+                                )}
+                            </dl>
                         </div>
                     </div>
-                </dl>
-            </div>
-
-            {/* Status & Monitoring */}
-            <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                <h2 className="text-base font-semibold text-foreground mb-2">Status & Monitoring</h2>
-                <dl className="space-y-1">
-                    <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Status</dt>
-                        <dd className="text-sm text-foreground capitalize">{server.effective_status}</dd>
-                    </div>
-                    {server.status_source ? (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Status Source</dt>
-                            <dd className="text-sm text-foreground capitalize">{server.status_source}</dd>
-                        </>
-                    ) : (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Status Source</dt>
-                            <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                        </>
-                    )}
-                    {server.confidence ? (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Confidence</dt>
-                            <dd className="text-sm text-foreground capitalize">{server.confidence}</dd>
-                        </>
-                    ) : (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Confidence</dt>
-                            <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                        </>
-                    )}
-                    {server.last_seen_at ? (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Last Seen</dt>
-                            <dd className="text-sm text-foreground">
-                                {new Date(server.last_seen_at).toLocaleString()}
-                            </dd>
-                        </>
-                    ) : (
-                        <>
-                            <dt className="text-sm font-medium text-muted-foreground">Last Seen</dt>
-                            <dd className="text-sm text-muted-foreground italic">Never</dd>
-                        </>
-                    )}
-                </dl>
-            </div>
-
-            {/* Ranking */}
-            {(server.rank_position !== null || server.rank_by !== null || server.rank_delta_24h !== null) && (
-                <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                    <h2 className="text-base font-semibold text-foreground mb-2">Ranking</h2>
-                    <dl className="space-y-1">
-                        {server.rank_position !== null ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Rank Position</dt>
-                                <dd className="text-sm text-foreground">#{server.rank_position}</dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Rank Position</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not ranked</dd>
-                            </>
-                        )}
-                        {server.rank_by ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Ranked By</dt>
-                                <dd className="text-sm text-foreground capitalize">{server.rank_by}</dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Ranked By</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                            </>
-                        )}
-                        {server.rank_delta_24h !== null ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Rank Change (24h)</dt>
-                                <dd className={`text-sm ${server.rank_delta_24h > 0 ? 'text-green-500' : server.rank_delta_24h < 0 ? 'text-red-500' : ''}`}>
-                                    {server.rank_delta_24h > 0 ? '+' : ''}{server.rank_delta_24h}
-                                </dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Rank Change (24h)</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not available</dd>
-                            </>
-                        )}
-                    </dl>
-                </div>
-            )}
-
-            {/* Cluster Info */}
-            {server.cluster_id && (
-                <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                    <h2 className="text-base font-semibold text-foreground mb-2">Cluster Information</h2>
-                    <dl className="space-y-1">
-                        <div>
-                            <dt className="text-sm font-medium text-muted-foreground">Cluster ID</dt>
-                            <dd className="text-sm text-foreground font-mono text-xs break-all">
-                                {server.cluster_id}
-                            </dd>
-                        </div>
-                        {server.cluster_name ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Name</dt>
-                                <dd className="text-sm text-foreground">{server.cluster_name}</dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Name</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                            </>
-                        )}
-                        {server.cluster_slug ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Slug</dt>
-                                <dd className="text-sm text-foreground font-mono">{server.cluster_slug}</dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Slug</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                            </>
-                        )}
-                        {server.cluster_visibility ? (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Visibility</dt>
-                                <dd className="text-sm text-foreground capitalize">{server.cluster_visibility}</dd>
-                            </>
-                        ) : (
-                            <>
-                                <dt className="text-sm font-medium text-muted-foreground">Cluster Visibility</dt>
-                                <dd className="text-sm text-muted-foreground italic">Not specified</dd>
-                            </>
-                        )}
-                    </dl>
-                </div>
-            )}
-
-            {/* Timestamps */}
-            <div className={`bg-card border border-border rounded-lg ${CARD_PADDING}`}>
-                <h2 className="text-base font-semibold text-foreground mb-2">Timestamps</h2>
-                <dl className="space-y-1">
-                    <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Created At</dt>
-                        <dd className="text-sm text-foreground">
-                            {new Date(server.created_at).toLocaleString()}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Updated At</dt>
-                        <dd className="text-sm text-foreground">
-                            {new Date(server.updated_at).toLocaleString()}
-                        </dd>
-                    </div>
-                </dl>
-            </div>
+                )}
             </div>
         </div>
     )

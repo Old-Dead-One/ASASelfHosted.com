@@ -209,6 +209,34 @@ async def list_directory_servers(
         now_utc=now_utc,
     )
 
+    total: int | None = None
+    if cursor is None:
+        total = await repo.count_servers(
+            q=q,
+            status=status,
+            mode=mode,
+            ruleset=ruleset,
+            game_mode=game_mode,
+            server_type=effective_server_type,
+            map_name=map_name,
+            cluster=cluster,
+            cluster_visibility=cluster_visibility,
+            cluster_id=cluster_id,
+            players_current_min=effective_players_min,
+            players_current_max=effective_players_max,
+            uptime_min=uptime_min,
+            quality_min=quality_min,
+            official_plus=official_plus,
+            modded=modded,
+            crossplay=crossplay,
+            console=console,
+            pc=pc,
+            is_cluster=is_cluster,
+            maps=maps,
+            mods=mods,
+            platforms=platforms,
+        )
+
     return DirectoryResponse(
         data=list(servers),
         limit=limit,
@@ -217,6 +245,7 @@ async def list_directory_servers(
         rank_by=rank_by,
         order=order,
         view=view,
+        total=total,
     )
 
 

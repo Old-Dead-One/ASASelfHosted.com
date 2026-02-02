@@ -20,14 +20,14 @@ export function ServerRow({ server }: ServerRowProps) {
 
     return (
         <div className="rounded-md border border-input bg-background-elevated shadow-sm py-2 px-3 hover:border-primary/30 transition-colors">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-nowrap">
                 {/* Status */}
                 <div className="shrink-0">
                     <StatusBadge status={server.effective_status ?? 'unknown'} />
                 </div>
 
                 {/* Main Content - single tight line */}
-                <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                <div className="flex-1 min-w-0 flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-foreground truncate">
                         {server.name}
                     </h3>

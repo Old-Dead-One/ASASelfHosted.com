@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     # Anomaly detection
     ANOMALY_DECAY_MINUTES: int = 30  # Clear anomaly flag after T minutes without spikes
 
+    # CurseForge API
+    CURSEFORGE_API_KEY: str = "$2a$10$RlYphOia.ZJJQk7LqNop2uFHjbW/3LXPSWAtjZbqcppXs8xBqX46C"  # Required for mod name resolution
+    CURSEFORGE_BASE_URL: str = "https://api.curseforge.com"
+    CURSEFORGE_ASA_GAME_ID: int | None = None  # Optional: pre-discovered ASA game ID
+
     def validate_non_local(self) -> None:
         """
         Validate required config for non-local environments.

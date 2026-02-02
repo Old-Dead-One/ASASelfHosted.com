@@ -53,7 +53,7 @@
 - ✅ Status badge display
 
 **Tests:**
-- ✅ `DashboardPage.test.tsx` (15 tests, 4 minor timing issues - non-blocking)
+- ✅ `DashboardPage.test.tsx` (15 tests passing)
 
 ---
 
@@ -291,9 +291,8 @@
 
 ## Test Results
 
-- **Total Tests**: 151
-- **Passing**: 147 (97.4%)
-- **Failing**: 4 (minor timing issues in DashboardPage tests, non-blocking)
+- **Total Tests**: 150
+- **Passing**: 150 (DashboardPage 15/15; ServerFilters per-page tests removed—per-page lives in HomePage)
 
 ---
 
@@ -320,5 +319,5 @@
 
 ---
 
-**Last Updated**: 2026-01-26
-**Sprint 6 Status**: ✅ **COMPLETE**
+**Last Updated**: 2026-02-02
+**Sprint 6 Status**: ✅ **COMPLETE** (all tests passing; favorites API live)

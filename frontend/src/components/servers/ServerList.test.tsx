@@ -73,6 +73,15 @@ function createWrapper() {
     )
 }
 
+const defaultPagedReturn = {
+    hasPreviousPage: false,
+    nextPage: vi.fn(),
+    prevPage: vi.fn(),
+    isFetching: false,
+    pageNumber: 1,
+    totalPages: undefined,
+}
+
 describe('ServerList', () => {
     beforeEach(() => {
         vi.clearAllMocks()
@@ -87,6 +96,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         const filters: ServerFilters = { view: 'card' }
@@ -108,6 +118,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         const filters: ServerFilters = { view: 'compact' }
@@ -132,6 +143,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
@@ -153,6 +165,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
@@ -172,6 +185,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
@@ -194,6 +208,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         const filters: ServerFilters = { view: 'card' }
@@ -217,6 +232,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         const filters: ServerFilters = { view: 'compact' }
@@ -226,7 +242,7 @@ describe('ServerList', () => {
         expect(screen.getByText('Server 2')).toBeInTheDocument()
     })
 
-    it('renders load more button when hasNextPage is true', () => {
+    it('renders Next page and Previous page when hasNextPage is true (paged mode)', () => {
         const servers = [createMockServer()]
 
         vi.mocked(useServers).mockReturnValue({
@@ -237,14 +253,35 @@ describe('ServerList', () => {
             hasNextPage: true,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
 
+        expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /previous page/i })).toBeInTheDocument()
+    })
+
+    it('renders Load more when paged={false} and hasNextPage is true', () => {
+        const servers = [createMockServer()]
+
+        vi.mocked(useServers).mockReturnValue({
+            servers,
+            isLoading: false,
+            error: null,
+            refetch: vi.fn(),
+            hasNextPage: true,
+            fetchNextPage: vi.fn(),
+            isFetchingNextPage: false,
+            ...defaultPagedReturn,
+        } as any)
+
+        render(<ServerList paged={false} />, { wrapper: createWrapper() })
+
         expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument()
     })
 
-    it('does not render load more button when hasNextPage is false', () => {
+    it('does not render pagination when hasNextPage and hasPreviousPage are false', () => {
         const servers = [createMockServer()]
 
         vi.mocked(useServers).mockReturnValue({
@@ -255,14 +292,16 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
 
-        expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /next page/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /previous page/i })).not.toBeInTheDocument()
     })
 
-    it('calls fetchNextPage when load more is clicked', async () => {
+    it('calls fetchNextPage when Next page is clicked', async () => {
         const user = userEvent.setup()
         const servers = [createMockServer()]
         const mockFetchNextPage = vi.fn()
@@ -275,17 +314,18 @@ describe('ServerList', () => {
             hasNextPage: true,
             fetchNextPage: mockFetchNextPage,
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
 
-        const loadMoreButton = screen.getByRole('button', { name: /load more/i })
-        await user.click(loadMoreButton)
+        const nextButton = screen.getByRole('button', { name: /next page/i })
+        await user.click(nextButton)
 
         expect(mockFetchNextPage).toHaveBeenCalledOnce()
     })
 
-    it('shows loading state on load more button when fetching', () => {
+    it('shows loading state on Next page button when fetching', () => {
         const servers = [createMockServer()]
 
         vi.mocked(useServers).mockReturnValue({
@@ -295,14 +335,16 @@ describe('ServerList', () => {
             refetch: vi.fn(),
             hasNextPage: true,
             fetchNextPage: vi.fn(),
-            isFetchingNextPage: true,
+            isFetchingNextPage: false,
+            ...defaultPagedReturn,
+            isFetching: true,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
 
-        const loadMoreButton = screen.getByRole('button', { name: /load more servers/i })
-        expect(loadMoreButton).toBeDisabled()
-        expect(loadMoreButton).toHaveTextContent('Loading…')
+        const nextButton = screen.getByRole('button', { name: /next page/i })
+        expect(nextButton).toBeDisabled()
+        expect(nextButton).toHaveTextContent('Loading…')
     })
 
     it('defaults to compact view when view is not specified', () => {
@@ -316,6 +358,7 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList />, { wrapper: createWrapper() })
@@ -325,7 +368,7 @@ describe('ServerList', () => {
         expect(screen.getByText('Test Server')).toBeInTheDocument()
     })
 
-    it('passes filters to useServers hook', () => {
+    it('passes filters and paged option to useServers hook', () => {
         const filters: ServerFilters = {
             q: 'test',
             status: 'online',
@@ -340,10 +383,11 @@ describe('ServerList', () => {
             hasNextPage: false,
             fetchNextPage: vi.fn(),
             isFetchingNextPage: false,
+            ...defaultPagedReturn,
         } as any)
 
         render(<ServerList filters={filters} />, { wrapper: createWrapper() })
 
-        expect(useServers).toHaveBeenCalledWith(filters)
+        expect(useServers).toHaveBeenCalledWith(filters, { paged: true })
     })
 })

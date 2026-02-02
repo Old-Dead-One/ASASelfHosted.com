@@ -32,9 +32,6 @@ export function cacheAuthSession(session: { access_token: string; expires_at?: n
     cachedSession = session
     if (session) {
         cacheExpiry = Date.now() + CACHE_DURATION_MS
-        if (import.meta.env.DEV) {
-            console.debug('[api] Cached auth session for immediate use')
-        }
     } else {
         cacheExpiry = 0
     }
@@ -44,9 +41,6 @@ export function cacheAuthSession(session: { access_token: string; expires_at?: n
  * Clear the cached session (called after onAuthStateChange confirms session is stored).
  */
 export function clearCachedSession() {
-    if (cachedSession && import.meta.env.DEV) {
-        console.debug('[api] Clearing cached session, relying on Supabase storage')
-    }
     cachedSession = null
     cacheExpiry = 0
 }
@@ -104,12 +98,9 @@ function safeParseJSON(text: string): any {
 async function getAuthToken(): Promise<string | null> {
     // Check cached session first (for immediate use after sign-in)
     if (cachedSession && Date.now() < cacheExpiry) {
-        if (import.meta.env.DEV) {
-            console.debug('[api] Using cached session token')
-        }
         return cachedSession.access_token
     }
-    
+
     // Clear expired cache
     if (Date.now() >= cacheExpiry && cachedSession) {
         clearCachedSession()
@@ -119,44 +110,23 @@ async function getAuthToken(): Promise<string | null> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-    if (import.meta.env.DEV) {
-        console.debug('[api] Checking for Supabase config:', {
-            hasUrl: !!supabaseUrl,
-            hasKey: !!supabaseAnonKey,
-        })
-    }
-
     if (supabaseUrl && supabaseAnonKey) {
         try {
             const { supabase } = await import('@/lib/supabase')
             if (supabase) {
-                if (import.meta.env.DEV) {
-                    console.debug('[api] Supabase client available, getting session...')
-                }
                 const { data: { session }, error } = await supabase.auth.getSession()
                 if (error) {
                     if (import.meta.env.DEV) {
                         console.warn('[api] Session check error:', error.message)
                     }
                 }
-                
-                if (import.meta.env.DEV) {
-                    console.debug('[api] Session check result:', {
-                        hasSession: !!session,
-                        hasAccessToken: !!session?.access_token,
-                        expiresAt: session?.expires_at,
-                    })
-                }
-                
+
                 let activeSession = session
                 // Refresh if expired or within 60s of expiry (access token can be rejected by backend)
                 if (activeSession?.expires_at) {
                     const expiresAtMs = activeSession.expires_at * 1000
                     const nowMs = Date.now()
                     if (nowMs >= expiresAtMs - 60_000) {
-                        if (import.meta.env.DEV) {
-                            console.debug('[api] Refreshing session (expires soon)')
-                        }
                         const { data: refreshed } = await supabase.auth.refreshSession()
                         if (refreshed?.session) {
                             activeSession = refreshed.session
@@ -164,9 +134,6 @@ async function getAuthToken(): Promise<string | null> {
                     }
                 }
                 if (activeSession?.access_token) {
-                    if (import.meta.env.DEV) {
-                        console.debug('[api] Using session token from Supabase storage')
-                    }
                     return activeSession.access_token
                 } else {
                     if (import.meta.env.DEV) {
@@ -183,10 +150,6 @@ async function getAuthToken(): Promise<string | null> {
                 console.error('[api] Auth token check failed:', err)
             }
         }
-    } else {
-        if (import.meta.env.DEV) {
-            console.debug('[api] Supabase not configured, skipping Supabase auth check')
-        }
     }
 
     // Fall back to dev auth token (local development)
@@ -197,9 +160,6 @@ async function getAuthToken(): Promise<string | null> {
         if (devToken) {
             // Only use dev token if Supabase is NOT configured
             if (!supabaseUrl || !supabaseAnonKey) {
-                if (import.meta.env.DEV) {
-                    console.debug('[api] Using dev auth token (Supabase not configured)')
-                }
                 return devToken
             } else {
                 if (import.meta.env.DEV) {
@@ -209,9 +169,6 @@ async function getAuthToken(): Promise<string | null> {
         }
     }
 
-    if (import.meta.env.DEV) {
-        console.debug('[api] No auth token available')
-    }
     return null
 }
 
@@ -283,11 +240,6 @@ export async function apiRequest<T>(
                 `[api] 401 Unauthorized on ${endpoint}. Token sent: ${hadToken}. ` +
                 'If signed in, try: sign out and back in to refresh your session.'
             )
-            if (hadToken) {
-                // Log token details for debugging (first 20 chars only for security)
-                const tokenPreview = token?.substring(0, 20) || 'null'
-                console.debug(`[api] Token preview: ${tokenPreview}...`)
-            }
         }
         if (data?.error) {
             throw new APIErrorResponse(data.error)
@@ -457,4 +409,33 @@ export async function deleteServer(serverId: string): Promise<{ success: boolean
     return apiRequest<{ success: boolean }>(`/api/v1/servers/${serverId}`, {
         method: 'DELETE',
     })
+}
+
+// =============================================================================
+// Mods Resolution
+// =============================================================================
+
+export interface ResolvedMod {
+    mod_id: number
+    name: string
+    slug: string | null
+    source: 'catalog' | 'curseforge' | 'user'
+}
+
+export interface ModResolveResponse {
+    data: ResolvedMod[]
+    missing: number[]
+}
+
+/** Resolve mod IDs to names. */
+export async function resolveMods(modIds: number[]): Promise<ModResolveResponse> {
+    return apiRequest<ModResolveResponse>('/api/v1/mods/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ mod_ids: modIds }),
+    })
+}
+
+/** Search mods by name prefix (autocomplete). */
+export async function searchMods(query: string, limit = 20): Promise<ResolvedMod[]> {
+    return apiRequest<ResolvedMod[]>(`/api/v1/mods/search?q=${encodeURIComponent(query)}&limit=${limit}`)
 }

@@ -513,6 +513,123 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         return servers, next_cursor
 
+    async def count_servers(
+        self,
+        q: str | None = None,
+        status: ServerStatus | None = None,
+        mode: VerificationMode | None = None,
+        ruleset: Ruleset | None = None,
+        game_mode: GameMode | None = None,
+        server_type: ServerType | None = None,
+        map_name: str | None = None,
+        cluster: str | None = None,
+        cluster_visibility: ClusterVisibility | None = None,
+        cluster_id: str | None = None,
+        players_current_min: int | None = None,
+        players_current_max: int | None = None,
+        uptime_min: float | None = None,
+        quality_min: float | None = None,
+        official_plus: TriState = "any",
+        modded: TriState = "any",
+        crossplay: TriState = "any",
+        console: TriState = "any",
+        pc: TriState = "any",
+        is_cluster: TriState = "any",
+        maps: list[str] | None = None,
+        mods: list[str] | None = None,
+        platforms: list[Platform] | None = None,
+    ) -> int:
+        """Return total number of servers matching the given filters."""
+        if not self._configured or self._supabase is None:
+            return 0
+
+        def _norm(ts: TriState) -> bool | None:
+            if ts == "any":
+                return None
+            return ts == "true"
+
+        try:
+            query = self._supabase.table("directory_view").select("id", count="exact")
+            if q and (q_trimmed := q.strip()):
+                or_conditions = ",".join(
+                    [
+                        f"name.ilike.%{q_trimmed}%",
+                        f"description.ilike.%{q_trimmed}%",
+                        f"map_name.ilike.%{q_trimmed}%",
+                        f"cluster_name.ilike.%{q_trimmed}%",
+                    ]
+                )
+                query = query.or_(or_conditions)
+            if status:
+                query = query.eq("effective_status", status)
+            if mode == "verified":
+                query = query.eq("is_verified", True)
+            elif mode == "manual":
+                query = query.eq("is_verified", False)
+            if ruleset:
+                query = query.eq("ruleset", ruleset)
+            elif server_type:
+                query = query.eq("server_type", server_type)
+            if game_mode:
+                query = query.eq("game_mode", game_mode)
+            if map_name and (map_trimmed := map_name.strip()):
+                query = query.ilike("map_name", f"%{map_trimmed}%")
+            if cluster and (cluster_trimmed := cluster.strip()):
+                query = query.ilike("cluster_slug", f"%{cluster_trimmed}%")
+            if cluster_visibility:
+                query = query.eq("cluster_visibility", cluster_visibility)
+            if cluster_id:
+                query = query.eq("cluster_id", cluster_id)
+            if players_current_min is not None:
+                query = query.gte("players_current", players_current_min)
+            if players_current_max is not None:
+                query = query.lte("players_current", players_current_max)
+            if uptime_min is not None:
+                query = query.gte("uptime_percent", uptime_min)
+            if quality_min is not None:
+                query = query.gte("quality_score", quality_min)
+            if is_cluster == "true":
+                query = query.not_.is_("cluster_id", "null")
+            elif is_cluster == "false":
+                query = query.is_("cluster_id", "null")
+            ov = _norm(official_plus)
+            if ov is not None:
+                query = query.eq("is_official_plus", ov)
+            md = _norm(modded)
+            if md is not None:
+                query = query.eq("is_modded", md)
+            cp = _norm(crossplay)
+            if cp is not None:
+                query = query.eq("is_crossplay", cp)
+            co = _norm(console)
+            if co is not None:
+                query = query.eq("is_console", co)
+            pv = _norm(pc)
+            if pv is not None:
+                query = query.eq("is_pc", pv)
+            if maps:
+                maps_clean = [m.strip() for m in maps if m.strip()]
+                if maps_clean:
+                    query = query.in_("map_name", maps_clean)
+            if mods:
+                mods_clean = [m.strip() for m in mods if m.strip()]
+                if mods_clean:
+                    query = query.overlaps("mod_list", mods_clean)
+            if platforms:
+                platforms_clean = [str(p).strip().lower() for p in platforms if str(p).strip()]
+                if platforms_clean:
+                    query = query.overlaps("platforms", platforms_clean)
+
+            response = query.limit(0).execute()
+            # supabase-py / postgrest returns count when count="exact" is used
+            count = getattr(response, "count", None)
+            if count is not None:
+                return int(count)
+            # Fallback: some clients expose it in headers or elsewhere
+            return 0
+        except Exception:
+            return 0
+
     async def get_server(self, server_id: str) -> DirectoryServer | None:
         """
         Get server by ID from Supabase directory_view.

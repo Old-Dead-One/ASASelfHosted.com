@@ -1,7 +1,8 @@
 /**
  * Server list component.
  *
- * Displays servers from directory with cursor pagination and "Load more".
+ * Displays servers from directory with cursor pagination.
+ * Paged mode: Previous / Next page (replaces list). Otherwise: "Load more" (appends).
  */
 
 import { useServers } from '@/hooks/useServers'
@@ -13,18 +14,26 @@ import type { ServerFilters } from './ServerFilters'
 
 interface ServerListProps {
     filters?: ServerFilters
+    /** If true, show one page at a time with Previous/Next. If false, show "Load more". */
+    paged?: boolean
 }
 
-export function ServerList({ filters }: ServerListProps) {
+export function ServerList({ filters, paged = true }: ServerListProps) {
     const {
         servers,
         isLoading,
         error,
         refetch,
         hasNextPage,
+        hasPreviousPage,
+        nextPage,
+        prevPage,
         fetchNextPage,
+        isFetching,
         isFetchingNextPage,
-    } = useServers(filters)
+        pageNumber,
+        totalPages,
+    } = useServers(filters, { paged })
 
     const view = filters?.view ?? 'compact'
     const isCardView = view === 'card'
@@ -108,19 +117,51 @@ export function ServerList({ filters }: ServerListProps) {
                     ))}
                 </div>
             )}
-            {hasNextPage && (
-                <div className="flex justify-center pt-4">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => fetchNextPage()}
-                        disabled={isFetchingNextPage}
-                        className="min-h-[44px]"
-                        aria-label="Load more servers"
-                    >
-                        {isFetchingNextPage ? 'Loading…' : 'Load more'}
-                    </Button>
-                </div>
+            {paged ? (
+                (hasPreviousPage || hasNextPage) && (
+                    <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => prevPage()}
+                            disabled={!hasPreviousPage || isFetching}
+                            className="min-h-[44px]"
+                            aria-label="Previous page"
+                        >
+                            Previous page
+                        </Button>
+                        {(totalPages !== undefined && totalPages > 0) && (
+                            <span className="text-sm text-muted-foreground min-h-[44px] flex items-center" aria-live="polite">
+                                Page {pageNumber} of {totalPages}
+                            </span>
+                        )}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => fetchNextPage()}
+                            disabled={!hasNextPage || isFetching}
+                            className="min-h-[44px]"
+                            aria-label="Next page"
+                        >
+                            {isFetching ? 'Loading…' : 'Next page'}
+                        </Button>
+                    </div>
+                )
+            ) : (
+                hasNextPage && (
+                    <div className="flex justify-center pt-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                            className="min-h-[44px]"
+                            aria-label="Load more servers"
+                        >
+                            {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                        </Button>
+                    </div>
+                )
             )}
         </div>
     )

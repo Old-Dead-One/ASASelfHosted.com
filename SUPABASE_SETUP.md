@@ -177,6 +177,25 @@ After setup is complete:
 3. **Monitor performance**: Check query performance in Supabase dashboard
 4. **Set up backups**: Configure automatic backups in Supabase dashboard
 
+## Optional: Fix Supabase security advisories
+
+If the Supabase dashboard shows security warnings, you can address them as follows.
+
+### 1. Function `update_updated_at_column` – mutable search_path
+
+Run this migration in **SQL Editor** so the function has an explicit `search_path`:
+
+1. Open `backend/app/db/migrations/018_function_search_path.sql`
+2. Copy its contents into SQL Editor and run it
+
+That sets `search_path = public` on the function and clears the “role mutable search_path” advisory.
+
+### 2. Auth – Leaked password protection (HaveIBeenPwned)
+
+Supabase can check passwords against HaveIBeenPwned.org to block compromised passwords. **This requires a Pro (or Teams/Enterprise) plan**; it is not available on the free tier.
+
+When you upgrade to Pro you can enable it (e.g. via **Authentication** → **Hooks** or the Auth settings for leaked-password checks). The app works fine without it on the free plan.
+
 ## Production Considerations
 
 For production deployments:

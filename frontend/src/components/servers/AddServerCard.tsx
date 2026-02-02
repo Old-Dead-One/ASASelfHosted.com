@@ -14,7 +14,7 @@ export function AddServerCard({ onClick }: AddServerCardProps) {
         <button
             type="button"
             onClick={onClick}
-            className="w-full h-full min-h-[260px] rounded-xl border-2 border-dashed border-input bg-background-elevated/60 shadow-md shadow-black/30 p-4 hover:border-primary/50 hover:bg-muted/20 transition-all flex flex-col items-center justify-center gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="w-full h-full min-h-[260px] rounded-xl border-2 border-dashed border-input bg-background-elevated/60 shadow-md shadow-black/30 hover:border-primary/50 hover:bg-muted/20 transition-all flex flex-col items-center justify-center gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label="Add new server"
         >
             <div className="w-16 h-16 rounded-full border-2 border-primary/50 flex items-center justify-center">

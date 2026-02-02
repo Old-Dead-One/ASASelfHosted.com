@@ -152,19 +152,6 @@ describe('ServerFilters', () => {
         expect(mockOnFiltersChange).toHaveBeenCalledWith({ order: 'asc' })
     })
 
-    it('updates per page limit', async () => {
-        const user = userEvent.setup()
-        render(<ServerFilters filters={{}} onFiltersChange={mockOnFiltersChange} />)
-
-        const limitSelect = screen.getByLabelText(/per page/i)
-        await user.selectOptions(limitSelect, '50')
-
-        const submitButton = screen.getByRole('button', { name: /apply filters/i })
-        await user.click(submitButton)
-
-        expect(mockOnFiltersChange).toHaveBeenCalledWith({ limit: 50 })
-    })
-
     it('resets all filters when reset button is clicked', async () => {
         const user = userEvent.setup()
         render(
@@ -217,13 +204,6 @@ describe('ServerFilters', () => {
 
         expect(rankBySelect.value).toBe('updated')
         expect(orderSelect.value).toBe('desc')
-    })
-
-    it('has correct default value for per page', () => {
-        render(<ServerFilters filters={{}} onFiltersChange={mockOnFiltersChange} />)
-
-        const limitSelect = screen.getByLabelText(/per page/i) as HTMLSelectElement
-        expect(limitSelect.value).toBe('25')
     })
 
     it('handles multiple filters at once', async () => {

@@ -43,14 +43,14 @@ interface DashboardServersCarouselProps {
     servers: DashboardServer[]
     onAddServer: () => void
     onEdit: (server: DashboardServer) => void
-    onDelete: (server: DashboardServer) => void
+    onClone: (server: DashboardServer) => void
 }
 
 export function DashboardServersCarousel({
     servers,
     onAddServer,
     onEdit,
-    onDelete,
+    onClone,
 }: DashboardServersCarouselProps) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const totalItems = 1 + servers.length
@@ -93,7 +93,7 @@ export function DashboardServersCarousel({
                             <DashboardServerCard
                                 server={server}
                                 onEdit={onEdit}
-                                onDelete={onDelete}
+                                onClone={onClone}
                             />
                         </div>
                     ))}

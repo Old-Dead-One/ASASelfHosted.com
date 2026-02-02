@@ -193,6 +193,9 @@ class DirectoryResponse(BaseSchema):
     cursor: str | None = None  # Opaque cursor for next page
     next_cursor: str | None = None  # Opaque cursor for next page (if more results)
 
+    # Total matching servers for current filters (only set when cursor is None / first page)
+    total: int | None = None
+
     # Optional echo for debugging / client UI (reflects actual applied values)
     rank_by: RankBy | None = None
     order: SortOrder | None = None

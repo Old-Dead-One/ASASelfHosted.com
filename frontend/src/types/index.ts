@@ -123,6 +123,9 @@ export interface DirectoryResponse {
     cursor: string | null
     next_cursor: string | null
 
+    /** Total servers matching current filters (only set on first page). */
+    total?: number
+
     // Optional echo for debugging / client UI (reflects actual applied values)
     rank_by: RankBy | null
     order: SortOrder | null

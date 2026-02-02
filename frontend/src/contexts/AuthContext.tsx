@@ -40,11 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const {
                 data: { subscription },
             } = supabase.auth.onAuthStateChange((event, session) => {
-                if (import.meta.env.DEV) {
-                    console.debug('[auth] Auth state changed:', event, session ? 'session present' : 'no session')
-                }
                 setUser(session?.user ?? null)
-                
+
                 // Clear cached session once Supabase has confirmed the session is stored
                 // This happens after SIGNED_IN event, so we can rely on Supabase storage
                 if (event === 'SIGNED_IN' && session) {
@@ -83,12 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 password,
             })
             if (error) throw error
-            
-            if (import.meta.env.DEV) {
-                console.debug('[auth] Sign in successful, user:', data.user?.email)
-                console.debug('[auth] Session present:', !!data.session)
-            }
-            
+
             // Cache the session for immediate API calls
             // This handles the timing issue where Supabase hasn't fully stored the session yet
             if (data.session) {
@@ -97,10 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     expires_at: data.session.expires_at,
                 })
             }
-            
+
             // Set user immediately
             setUser(data.user)
-            
+
             // Note: onAuthStateChange will fire and clear the cache after Supabase stores the session
             // This ensures smooth transition from cached session to Supabase storage
         } else {

@@ -118,6 +118,39 @@ class DirectoryRepository(ABC):
         ...
 
     @abstractmethod
+    async def count_servers(
+        self,
+        q: str | None = None,
+        status: ServerStatus | None = None,
+        mode: VerificationMode | None = None,
+        ruleset: Ruleset | None = None,
+        game_mode: GameMode | None = None,
+        server_type: ServerType | None = None,
+        map_name: str | None = None,
+        cluster: str | None = None,
+        cluster_visibility: ClusterVisibility | None = None,
+        cluster_id: str | None = None,
+        players_current_min: int | None = None,
+        players_current_max: int | None = None,
+        uptime_min: float | None = None,
+        quality_min: float | None = None,
+        official_plus: TriState = "any",
+        modded: TriState = "any",
+        crossplay: TriState = "any",
+        console: TriState = "any",
+        pc: TriState = "any",
+        is_cluster: TriState = "any",
+        maps: list[str] | None = None,
+        mods: list[str] | None = None,
+        platforms: list[Platform] | None = None,
+    ) -> int:
+        """
+        Return total number of servers matching the given filters.
+        Used for "total servers" display when cursor is None.
+        """
+        ...
+
+    @abstractmethod
     async def get_facets(self) -> dict[str, list[str]]:
         """
         Get available filter facets from directory data.

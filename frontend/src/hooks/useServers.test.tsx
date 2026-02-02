@@ -234,10 +234,10 @@ describe('useServers', () => {
         expect(callUrl).toContain('order=desc')
     })
 
-    it('handles pagination with cursor', async () => {
+    it('handles pagination with cursor (paged mode: next page replaces list)', async () => {
         const firstPage: DirectoryResponse = {
             data: [createMockServer({ id: 'server-1' })],
-            limit: 25,
+            limit: 2,
             cursor: null,
             next_cursor: 'cursor-123',
             rank_by: null,
@@ -247,7 +247,7 @@ describe('useServers', () => {
 
         const secondPage: DirectoryResponse = {
             data: [createMockServer({ id: 'server-2' })],
-            limit: 25,
+            limit: 2,
             cursor: 'cursor-123',
             next_cursor: null,
             rank_by: null,
@@ -268,16 +268,19 @@ describe('useServers', () => {
         })
 
         expect(result.current.servers).toHaveLength(1)
+        expect(result.current.servers[0].id).toBe('server-1')
         expect(result.current.hasNextPage).toBe(true)
+        expect(result.current.hasPreviousPage).toBe(false)
 
-        // Fetch next page
-        await result.current.fetchNextPage()
+        result.current.nextPage()
 
         await waitFor(() => {
-            expect(result.current.servers).toHaveLength(2)
+            expect(result.current.servers).toHaveLength(1)
+            expect(result.current.servers[0].id).toBe('server-2')
         })
 
         expect(result.current.hasNextPage).toBe(false)
+        expect(result.current.hasPreviousPage).toBe(true)
     })
 
     it('hides load more when search is active', async () => {
@@ -322,7 +325,7 @@ describe('useServers', () => {
         expect(result.current.servers).toHaveLength(0)
     })
 
-    it('flattens pages into single servers array', async () => {
+    it('flattens pages into single servers array when paged is false', async () => {
         const page1: DirectoryResponse = {
             data: [
                 createMockServer({ id: 'server-1' }),
@@ -350,7 +353,7 @@ describe('useServers', () => {
             .mockResolvedValueOnce(page1)
             .mockResolvedValueOnce(page2)
 
-        const { result } = renderHook(() => useServers(), {
+        const { result } = renderHook(() => useServers(undefined, { paged: false }), {
             wrapper: createWrapper(),
         })
 

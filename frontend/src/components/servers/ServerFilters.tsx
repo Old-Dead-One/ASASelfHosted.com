@@ -8,6 +8,9 @@ import { useState, FormEvent, useEffect } from 'react'
 import type { ServerStatus, VerificationMode, GameMode, Ruleset, SortOrder, RankBy, DirectoryView, TriState } from '@/types'
 import { Button } from '@/components/ui/Button'
 
+/** Platform filter: PC Only, Console Only, or Crossplay. Maps to backend pc/console/crossplay params. */
+export type PlatformFilter = 'pc' | 'console' | 'crossplay'
+
 export interface ServerFilters {
     q?: string
     status?: ServerStatus
@@ -22,6 +25,8 @@ export interface ServerFilters {
     view?: DirectoryView
     /** Filter by cluster association (any/true/false). true = has cluster, false = no cluster */
     is_cluster?: TriState
+    /** Filter by platform: PC Only, Console Only, or Crossplay */
+    platform?: PlatformFilter
 }
 
 interface ServerFiltersProps {
@@ -30,7 +35,7 @@ interface ServerFiltersProps {
 }
 
 export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) {
-    const [isOpen, setIsOpen] = useState(false)
+    const [isOpen, setIsOpen] = useState(true)
     const [localFilters, setLocalFilters] = useState<ServerFilters>(filters)
 
     useEffect(() => {
@@ -54,18 +59,19 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
         filters.mode ||
         filters.game_mode ||
         filters.ruleset ||
-        filters.is_cluster
+        filters.is_cluster ||
+        filters.platform
     )
 
     return (
-        <div className="mb-6">
+        <div className="mb-4">
             <div className="flex items-center justify-between mb-4">
                 <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="min-h-[44px]"
+                    className="min-h-[40px]"
                     aria-expanded={isOpen}
                     aria-controls="filters-panel"
                 >
@@ -74,13 +80,12 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                 {hasActiveFilters && (
                     <Button
                         type="button"
-                        variant="ghost"
+                        variant="secondary"
                         size="sm"
                         onClick={handleReset}
-                        className="text-xs min-h-[44px]"
+                        className="text-xs min-h-[40px]"
                         aria-label="Clear all filters"
                     >
-                        Clear all
                     </Button>
                 )}
             </div>
@@ -91,25 +96,43 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                     onSubmit={handleSubmit}
                     className="card-elevated p-4 space-y-3"
                 >
-                    {/* Search */}
-                    <div>
-                        <label htmlFor="search" className="label-tek">Search</label>
-                        <input
-                            id="search"
-                            type="text"
-                            value={localFilters.q || ''}
-                            onChange={(e) => setLocalFilters({ ...localFilters, q: e.target.value || undefined })}
-                            placeholder="Search servers..."
-                            className="input-tek"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {/* Status Filter */}
+                    {/* Row 1: Search | Cluster | Status (left to right); same 6-col grid as row 2 for alignment */}
+                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
+                        <div className="lg:col-span-4">
+                            <label htmlFor="search" className="label-tek">Search</label>
+                            <input
+                                id="search"
+                                type="text"
+                                value={localFilters.q || ''}
+                                onChange={(e) => setLocalFilters({ ...localFilters, q: e.target.value || undefined })}
+                                placeholder="Search servers..."
+                                className="input-tek"
+                            />
+                        </div>
                         <div>
-                        <label htmlFor="status" className="label-tek">
-                            Status
-                        </label>
+                            <label htmlFor="is_cluster" className="label-tek">
+                                Cluster
+                            </label>
+                            <select
+                                id="is_cluster"
+                                value={localFilters.is_cluster || 'any'}
+                                onChange={(e) =>
+                                    setLocalFilters({
+                                        ...localFilters,
+                                        is_cluster: (e.target.value === 'any' ? undefined : e.target.value) as TriState | undefined,
+                                    })
+                                }
+                                className="input-tek w-full"
+                            >
+                                <option value="any">All</option>
+                                <option value="true">Has Cluster</option>
+                                <option value="false">Standalone</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="status" className="label-tek">
+                                Status
+                            </label>
                             <select
                                 id="status"
                                 value={localFilters.status || ''}
@@ -119,7 +142,7 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                                         status: (e.target.value || undefined) as ServerStatus | undefined,
                                     })
                                 }
-                                className="input-tek"
+                                className="input-tek w-full"
                             >
                                 <option value="">All</option>
                                 <option value="online">Online</option>
@@ -127,8 +150,10 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                                 <option value="unknown">Unknown</option>
                             </select>
                         </div>
+                    </div>
 
-                        {/* Verification Mode */}
+                    {/* Row 2: Verification | Game Mode | Ruleset | Platform | Sort By | Order */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
                         <div>
                             <label htmlFor="mode" className="label-tek">
                                 Verification
@@ -150,7 +175,6 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                             </select>
                         </div>
 
-                        {/* Game Mode */}
                         <div>
                             <label htmlFor="game_mode" className="label-tek">
                                 Game Mode
@@ -173,7 +197,6 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                             </select>
                         </div>
 
-                        {/* Ruleset */}
                         <div>
                             <label htmlFor="ruleset" className="label-tek">
                                 Ruleset
@@ -197,31 +220,28 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                             </select>
                         </div>
 
-                        {/* Cluster Filter */}
                         <div>
-                            <label htmlFor="is_cluster" className="label-tek">
-                                Cluster
+                            <label htmlFor="platform" className="label-tek">
+                                Platform
                             </label>
                             <select
-                                id="is_cluster"
-                                value={localFilters.is_cluster || 'any'}
+                                id="platform"
+                                value={localFilters.platform || ''}
                                 onChange={(e) =>
                                     setLocalFilters({
                                         ...localFilters,
-                                        is_cluster: (e.target.value === 'any' ? undefined : e.target.value) as TriState | undefined,
+                                        platform: (e.target.value || undefined) as PlatformFilter | undefined,
                                     })
                                 }
                                 className="input-tek"
                             >
-                                <option value="any">All</option>
-                                <option value="true">Has Cluster</option>
-                                <option value="false">Standalone</option>
+                                <option value="">All</option>
+                                <option value="pc">PC Only</option>
+                                <option value="console">Console Only</option>
+                                <option value="crossplay">Crossplay</option>
                             </select>
                         </div>
-                    </div>
 
-                    {/* Sort */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label htmlFor="rank_by" className="label-tek">
                                 Sort By
@@ -268,10 +288,10 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                     </div>
 
                     <div className="flex gap-2 pt-1">
-                        <Button type="submit" variant="primary" size="sm" className="min-h-[44px]">
+                        <Button type="submit" variant="primary" size="sm">
                             Apply Filters
                         </Button>
-                        <Button type="button" variant="secondary" size="sm" onClick={handleReset} className="min-h-[44px]" aria-label="Reset all filters">
+                        <Button type="button" variant="secondary" size="sm" onClick={handleReset} aria-label="Reset all filters">
                             Reset
                         </Button>
                     </div>

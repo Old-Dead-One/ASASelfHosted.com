@@ -106,6 +106,22 @@ Extends Sprint 0 schema with:
 1. Run after `012_security_fixes.sql`.
 2. See `013_sprint_6_hosting_provider_VERIFY.md` for verification.
 
+### `017_security_invoker_views.sql`
+**Fix Supabase SECURITY DEFINER warnings**
+
+Recreates `directory_view` and `heartbeats_public` with `SECURITY INVOKER` so that RLS and permissions of the **querying user** apply (not the view owner). Resolves Supabase security advisories about views defined with SECURITY DEFINER.
+
+**Requires:** PostgreSQL 15+. Run after `012_security_fixes.sql`. Works after 013, 014, or 015.
+
+**To Run:** Copy contents into Supabase SQL Editor and execute. Re-grants SELECT to anon/authenticated.
+
+### `018_function_search_path.sql`
+**Fix mutable search_path on update_updated_at_column**
+
+Sets `search_path = public` on the trigger function so Supabase no longer reports “role mutable search_path”. Run after `001_sprint_0_schema.sql` (any time after the function exists).
+
+**To Run:** Copy contents into Supabase SQL Editor and execute.
+
 ### `012_security_fixes.sql`
 **Security Fixes - Critical Security Boundary Fixes**
 

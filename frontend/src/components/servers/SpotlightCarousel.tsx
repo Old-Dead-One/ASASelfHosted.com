@@ -1,8 +1,9 @@
 /**
- * Newbie carousel component.
+ * Spotlight carousel component.
  *
- * Displays a carousel of newbie-friendly servers with prev/next arrows.
- * Criteria: boosted, guides enabled, friendly tags, verified uptime
+ * Displays a carousel of featured servers with prev/next arrows.
+ * Can be used for various spotlight categories (Newbie-Friendly, New Servers, Hot, etc.).
+ * Server selection logic to be implemented.
  */
 
 import { useRef } from 'react'
@@ -16,10 +17,10 @@ const CARD_WIDTH_PX = 320
 const GAP_PX = 16
 const SCROLL_AMOUNT = CARD_WIDTH_PX + GAP_PX
 
-export function NewbieCarousel() {
+export function SpotlightCarousel() {
     const scrollRef = useRef<HTMLDivElement>(null)
     const { data, isLoading, error } = useQuery({
-        queryKey: ['servers', 'newbie'],
+        queryKey: ['servers', 'spotlight'],
         queryFn: async () => {
             const params = new URLSearchParams()
             params.set('ruleset', 'boosted')
@@ -53,7 +54,7 @@ export function NewbieCarousel() {
     if (error || servers.length === 0) {
         return (
             <div className="text-center py-8 text-muted-foreground">
-                <p>No newbie-friendly servers found.</p>
+                <p>No spotlight servers found.</p>
                 <p className="text-sm mt-1">Try the full directory below.</p>
             </div>
         )
