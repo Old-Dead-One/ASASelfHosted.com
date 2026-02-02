@@ -15,7 +15,7 @@ import { apiRequest } from '@/lib/api'
 import type { DirectoryResponse, DirectoryServer } from '@/types'
 import type { ServerFilters } from '@/components/servers/ServerFilters'
 
-const DEFAULT_LIMIT = 25
+const DEFAULT_LIMIT = 24
 
 export interface UseServersOptions {
     /** If true, show one page at a time with Previous/Next (replace list). If false, append with "Load more". */

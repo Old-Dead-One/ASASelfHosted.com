@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Navigate, Link } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
 import { useServer } from '@/hooks/useServers'
 import { Badge } from '@/components/ui/Badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -97,6 +98,7 @@ function CopyableAddress({
 
 export function ServerPage() {
     const { serverId } = useParams<{ serverId: string }>()
+    const { isAuthenticated } = useAuth()
     const { data: server, isLoading, error } = useServer(serverId || '')
     const [resolvedMods, setResolvedMods] = useState<Map<number, ResolvedMod>>(new Map())
     const [resolvingMods, setResolvingMods] = useState(false)
@@ -434,7 +436,7 @@ export function ServerPage() {
                                     <CopyableAddress value={server.join_address} label="Server Address" />
                                 </div>
                             )}
-                            {server.join_password && (
+                            {server.join_password && isAuthenticated && (
                                 <div className="mb-2">
                                     <CopyableAddress value={server.join_password} label="Join Password" />
                                 </div>

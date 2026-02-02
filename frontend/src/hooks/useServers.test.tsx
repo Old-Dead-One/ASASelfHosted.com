@@ -91,7 +91,7 @@ describe('useServers', () => {
     it('fetches servers with default limit', async () => {
         const mockResponse: DirectoryResponse = {
             data: [createMockServer()],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: null,
             rank_by: null,
@@ -112,7 +112,7 @@ describe('useServers', () => {
         expect(result.current.servers).toHaveLength(1)
         expect(result.current.servers[0].name).toBe('Test Server')
         expect(apiRequest).toHaveBeenCalledWith(
-            expect.stringContaining('limit=25')
+            expect.stringContaining('limit=24')
         )
     })
 
@@ -146,7 +146,7 @@ describe('useServers', () => {
     it('applies search filter', async () => {
         const mockResponse: DirectoryResponse = {
             data: [],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: null,
             rank_by: null,
@@ -173,7 +173,7 @@ describe('useServers', () => {
     it('applies status filter', async () => {
         const mockResponse: DirectoryResponse = {
             data: [],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: null,
             rank_by: null,
@@ -200,7 +200,7 @@ describe('useServers', () => {
     it('applies multiple filters', async () => {
         const mockResponse: DirectoryResponse = {
             data: [],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: null,
             rank_by: null,
@@ -286,7 +286,7 @@ describe('useServers', () => {
     it('hides load more when search is active', async () => {
         const mockResponse: DirectoryResponse = {
             data: [createMockServer()],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: 'cursor-123',
             rank_by: null,
@@ -331,7 +331,7 @@ describe('useServers', () => {
                 createMockServer({ id: 'server-1' }),
                 createMockServer({ id: 'server-2' }),
             ],
-            limit: 25,
+            limit: 24,
             cursor: null,
             next_cursor: 'cursor-123',
             rank_by: null,
@@ -341,7 +341,7 @@ describe('useServers', () => {
 
         const page2: DirectoryResponse = {
             data: [createMockServer({ id: 'server-3' })],
-            limit: 25,
+            limit: 24,
             cursor: 'cursor-123',
             next_cursor: null,
             rank_by: null,

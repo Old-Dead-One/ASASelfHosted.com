@@ -13,7 +13,7 @@ import { useServers } from '@/hooks/useServers'
 import type { DirectoryView } from '@/types'
 
 export function HomePage() {
-    const [filters, setFilters] = useState<ServerFiltersType>({ view: 'compact', limit: 25 })
+    const [filters, setFilters] = useState<ServerFiltersType>({ view: 'compact', limit: 24 })
     const { total } = useServers(filters)
 
     return (
@@ -37,7 +37,7 @@ export function HomePage() {
                             </label>
                             <select
                                 id="per-page"
-                                value={filters.limit ?? 25}
+                                value={filters.limit ?? 24}
                                 onChange={(e) => {
                                     const limit = Number(e.target.value)
                                     setFilters({ ...filters, limit })
@@ -45,9 +45,9 @@ export function HomePage() {
                                 className="input-tek min-h-[40px] w-auto min-w-[4rem]"
                                 aria-label="Servers per page"
                             >
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
+                                <option value={24}>24</option>
+                                <option value={30}>30</option>
+                                <option value={36}>36</option>
                             </select>
                         </div>
                         <div className="flex items-center gap-2">

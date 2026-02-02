@@ -263,15 +263,20 @@ Sentry (web + api)
 Deployment runbook
 Backups + basic ops checklist
 Packaging agent into .exe
+Trust & transparency pages (required by launch; see 5_Appendix D.5):
+Verification Explained — manual vs Verified+, what verification proves, cryptographic keys, data-driven rankings
+Consent & Privacy by Design — dual-consent model, in-game authorization, revocation behavior
 Docs:
 install agent
 troubleshooting
 revoke/rotate token
 firewall tips
+Optional: Platform status page (/status) for uptime or service status (post-MVP if not in scope).
 Acceptance
 Production deploy
 Agent install success on a clean Windows host
 Rollback path exists
+Trust pages live and linked from footer or about
 
 Post-Launch Roadmap (Optional, Demand-driven)
 Top/Hot carousels

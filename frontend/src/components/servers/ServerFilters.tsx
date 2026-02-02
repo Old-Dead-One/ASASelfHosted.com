@@ -19,7 +19,7 @@ export interface ServerFilters {
     ruleset?: Ruleset
     rank_by?: RankBy
     order?: SortOrder
-    /** Page size (directory limit). Default 25. */
+    /** Page size (directory limit). Default 24 (multiple of 3 for card view). */
     limit?: number
     /** View mode: 'compact' (row) or 'card'. Default 'compact'. */
     view?: DirectoryView

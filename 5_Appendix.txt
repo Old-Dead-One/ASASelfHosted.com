@@ -1,0 +1,219 @@
+Appendix D — Competitive Reference & Page Architecture Rationale
+
+(BattleMetrics Structural Analysis)
+
+Purpose
+
+This appendix documents a structural analysis of BattleMetrics as a reference platform, identifying which pages and patterns are -functionally necessary-, which should be adapted, and which are intentionally excluded from ASA Self-Hosted.
+
+This is not a feature comparison and not an endorsement.
+It exists to validate architectural decisions, avoid unnecessary reinvention, and ensure long-term scalability without compromising the platform’s consent-first design.
+
+D.1 Reference Platform Overview
+
+BattleMetrics is a mature, widely used platform for game server discovery and analytics. Its success is not due to visual design or monetization tactics, but to a clear separation of concerns across three domains:
+
+1. Public Discovery — Players finding servers
+2. Operational Tooling — Server owners managing assets
+3. Trust Signaling — Accuracy, history, verification, transparency
+
+All major BattleMetrics pages map to one (and only one) of these domains.
+
+ASA Self-Hosted adopts this structural clarity while diverging on data collection, consent, and monetization.
+
+D.2 Account Model Validation
+
+Single Account Type (Player + Server Owner)
+
+BattleMetrics implicitly treats server owners as players by using a unified account system with contextual permissions.
+
+ASA Self-Hosted explicitly adopts this model.
+
+Design Decision (Locked):
+
+- One account type
+- No permanent role distinction
+- Capabilities emerge from actions (claiming servers, generating keys, granting consent)
+
+Rationale:
+
+- Server owners are also players
+- Players may later become owners
+- Future player features require continuity
+- Simplifies auth, RLS, and UI logic
+
+This validates the decision to not create separate “Player” and “Owner” account systems.
+
+D.3 Dashboard-Centric User Experience
+
+BattleMetrics does not expose a public “Users” page.
+Instead, all authenticated activity is anchored to a Dashboard.
+
+ASA Self-Hosted Adoption
+
+The Dashboard is the canonical post-login entry point.
+
+/dashboard (Single Surface)
+
+Initial sections:
+
+- My Servers
+- My Clusters
+- Favorites
+- Subscriptions
+- Keys & Verification
+- Consent & Permissions
+
+Explicit Non-Goals:
+
+- No split dashboards (player vs owner)
+- No duplicate navigation trees
+
+Outcome:
+
+- Reduced UX fragmentation
+- Clear mental model
+- Future-proof for player stats and PvP integrations
+
+D.4 Public Page Categories (Adopted)
+
+D.4.1 Server Pages
+
+BattleMetrics server pages establish the minimum viable expectations for:
+
+- Status visibility
+- Metadata
+- Join paths
+- Historical context
+
+ASA Self-Hosted server pages meet and exceed this baseline by adding:
+
+- Cryptographic identity
+- Verified cluster membership
+- Explicit consent boundaries
+
+This page type is considered a pillar page and is mandatory.
+
+D.4.2 Cluster Pages (Phase 1.5+)
+
+BattleMetrics treats organizations as first-class entities.
+
+ASA Self-Hosted mirrors this with Cluster Pages.
+
+Planned capabilities:
+
+- Member server aggregation
+- Map coverage
+- Cluster-level verification
+- Aggregate uptime and stability indicators
+
+Rationale:
+Clusters are the true unit of loyalty and identity in Ark ecosystems.
+
+D.4.3 Player Profile Pages (Consent-Bound)
+
+BattleMetrics exposes detailed player histories by default.
+
+ASA Self-Hosted intentionally diverges.
+
+Player Profile Pages:
+
+- Exist only with player opt-in
+- Display favorites, badges, and optional activity indicators
+- Never expose raw identifiers or hidden tracking
+
+This preserves structural parity without violating consent principles.
+
+D.5 Trust & Transparency Pages (Required by Launch)
+
+BattleMetrics earns long-term trust by over-explaining its systems.
+
+ASA Self-Hosted adopts this philosophy.
+
+These pages are required by launch (not necessarily in the first MVP slice) and are part of the platform’s trust surface.
+
+Required Pages:
+
+Verification Explained
+
+Explains:
+
+- Manual vs Verified+
+- What verification proves
+- What it does not prove
+- Why cryptographic keys exist
+- Why rankings are data-driven, not monetized
+
+Consent & Privacy by Design
+
+Documents:
+
+- Dual-consent model
+- In-game authorization requirements
+- Explicit non-capabilities
+- Revocation behavior
+
+These pages are defensive by design and considered part of the platform’s trust surface.
+
+D.6 Pages Explicitly Not Adopted
+
+The following BattleMetrics patterns are intentionally excluded:
+
+❌ Live Player Tracking & Maps
+
+- Violates consent-first principles
+- Introduces unnecessary privacy risk
+- Creates EOS adjacency concerns
+
+❌ Paid Ranking Placement
+
+- Conflicts with data-driven badge system
+- Undermines platform neutrality
+- Introduces long-term trust erosion
+
+These exclusions are permanent unless explicitly re-approved by design review.
+
+D.7 Canonical Page Map (Reference)
+
+This page map reflects structural intent, not implementation order.
+
+Home/directory (e.g. / or /directory) may include carousels (Newbie, Top 100, Hot) as content on the same route, not as separate routes.
+
+/status (platform status or uptime page) is optional and may be post-MVP.
+
+```
+/
+├─ directory
+│  ├─ servers
+│  ├─ clusters
+│
+├─ server/{id}
+├─ cluster/{id}
+├─ player/{handle}
+│
+├─ dashboard
+│  ├─ servers
+│  ├─ clusters
+│  ├─ favorites
+│  ├─ keys
+│  ├─ consent
+│
+├─ verification
+├─ consent
+├─ docs
+├─ about
+├─ terms
+├─ privacy
+└─ status (optional)
+```
+
+D.8 Conclusion
+
+This appendix confirms that ASA Self-Hosted’s current direction:
+
+- Aligns with proven discovery platforms
+- Improves upon them in consent enforcement
+- Avoids common monetization and privacy pitfalls
+- Scales cleanly into future player and PvP features
+
+No architectural changes are required as a result of this analysis.

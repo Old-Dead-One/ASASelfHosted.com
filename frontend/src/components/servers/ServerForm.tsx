@@ -16,7 +16,7 @@ const FORM_SPACE = 'space-y-3'
 
 const DEFAULT_JOIN_INSTRUCTIONS = `Open ARK: Survival Ascended and go to Join Game.
 Select UNOFFICIAL at the top, then enable Show Player Servers.
-Enter the name of the server in the search bar.
+Enter the name of the server you wish to join in the search bar.
 Use Refresh if the server does not appear immediately.
 Use the password above if required.
 Join details may also be provided via the server's Discord or community page.
