@@ -36,14 +36,15 @@ def get_directory_repo() -> DirectoryRepository:
     """
     Directory repository provider.
 
-    Prefers Supabase if configured (SUPABASE_URL and SUPABASE_ANON_KEY set).
+    Prefers Supabase if configured (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set).
+    Uses service_role so directory_view can stay SECURITY INVOKER without granting anon SELECT on base tables.
     Falls back to mock data in local/dev/test if Supabase not configured.
     In staging/production, Supabase is required (fails fast if not configured).
     """
     settings = get_settings()
 
-    # Try to use Supabase if credentials are configured
-    if settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY:
+    # Try to use Supabase if credentials are configured (service_role for directory so INVOKER views work)
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
         global _supabase_repo
         if _supabase_repo is None:
             try:

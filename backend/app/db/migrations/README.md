@@ -113,12 +113,26 @@ Recreates `directory_view` and `heartbeats_public` with `SECURITY INVOKER` so th
 
 **Requires:** PostgreSQL 15+. Run after `012_security_fixes.sql`. Works after 013, 014, or 015.
 
+**Note:** The backend directory API uses the **service_role** key (not anon), so with 017 the directory listing works and the SECURITY DEFINER warning is cleared. Do not run 019 unless you need DEFINER for another reason; if you already ran 019, re-run 017 to put views back to INVOKER.
+
 **To Run:** Copy contents into Supabase SQL Editor and execute. Re-grants SELECT to anon/authenticated.
 
 ### `018_function_search_path.sql`
 **Fix mutable search_path on update_updated_at_column**
 
 Sets `search_path = public` on the trigger function so Supabase no longer reports “role mutable search_path”. Run after `001_sprint_0_schema.sql` (any time after the function exists).
+
+**To Run:** Copy contents into Supabase SQL Editor and execute.
+
+### `019_directory_views_definer.sql`
+**Restore SECURITY DEFINER for directory_view and heartbeats_public (optional, not recommended)**
+
+Only needed if the directory repo used the anon key. The backend now uses **service_role** for the directory repo, so SECURITY INVOKER is preferred. If you see the SECURITY DEFINER warning, run **020** to set the views to INVOKER.
+
+### `020_views_security_invoker.sql`
+**Set directory_view and heartbeats_public to SECURITY INVOKER (clears advisory)**
+
+Runs `ALTER VIEW ... SET (security_invoker = true)` on both views. Use this to clear the Supabase "SECURITY DEFINER" advisory without dropping/recreating the views. Backend directory API uses service_role, so directory listing keeps working.
 
 **To Run:** Copy contents into Supabase SQL Editor and execute.
 

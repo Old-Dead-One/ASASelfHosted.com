@@ -181,7 +181,23 @@ After setup is complete:
 
 If the Supabase dashboard shows security warnings, you can address them as follows.
 
-### 1. Function `update_updated_at_column` – mutable search_path
+### 1. Views (directory_view, heartbeats_public) – SECURITY DEFINER warning
+
+The backend **directory** API uses the **service_role** key to query these views, so they can stay **SECURITY INVOKER** (no warning) without granting anon SELECT on base tables.
+
+**To clear the advisory:** Run `020_views_security_invoker.sql` in SQL Editor. It runs:
+
+```sql
+ALTER VIEW directory_view SET (security_invoker = true);
+ALTER VIEW heartbeats_public SET (security_invoker = true);
+```
+
+1. Open `backend/app/db/migrations/020_views_security_invoker.sql`
+2. Copy its contents into Supabase SQL Editor and run it
+
+The advisory should disappear. Directory listing keeps working (backend uses service_role).
+
+### 2. Function `update_updated_at_column` – mutable search_path
 
 Run this migration in **SQL Editor** so the function has an explicit `search_path`:
 
@@ -190,7 +206,7 @@ Run this migration in **SQL Editor** so the function has an explicit `search_pat
 
 That sets `search_path = public` on the function and clears the “role mutable search_path” advisory.
 
-### 2. Auth – Leaked password protection (HaveIBeenPwned)
+### 3. Auth – Leaked password protection (HaveIBeenPwned)
 
 Supabase can check passwords against HaveIBeenPwned.org to block compromised passwords. **This requires a Pro (or Teams/Enterprise) plan**; it is not available on the free tier.
 

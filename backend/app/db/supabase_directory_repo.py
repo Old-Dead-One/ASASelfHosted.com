@@ -131,21 +131,21 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         self._configured = False
         self._config_error: str | None = None
 
-        if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+        if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
             if settings.ENV not in ("local", "development", "test"):
                 raise RuntimeError(
-                    "SupabaseDirectoryRepository requires SUPABASE_URL and SUPABASE_ANON_KEY in non-local environments"
+                    "SupabaseDirectoryRepository requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in non-local environments"
                 )
             # In local/dev/test, allow unconfigured state (will raise on actual use)
             self._config_error = "Supabase credentials not configured"
         else:
-            # Credentials exist - attempt to initialize client
+            # Credentials exist - attempt to initialize client (service_role so we can use SECURITY INVOKER views without granting anon SELECT on base tables)
             try:
-                from app.core.supabase import get_supabase_anon
+                from app.core.supabase import get_supabase_admin
 
-                self._supabase = get_supabase_anon()
+                self._supabase = get_supabase_admin()
                 if self._supabase is None:
-                    raise RuntimeError("get_supabase_anon() returned None")
+                    raise RuntimeError("get_supabase_admin() returned None")
                 self._configured = True
             except Exception as e:
                 # In non-local, client init failure is a hard error

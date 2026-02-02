@@ -11,12 +11,13 @@ Two clients are provided:
 - supabase_admin: Uses service role key, bypasses RLS (admin operations only)
 
 Most operations should use the anon client with user JWT tokens to enforce RLS.
-Admin client is only for operations that require elevated privileges:
+Admin client is used for:
+- Directory reads (so directory_view can stay SECURITY INVOKER without granting anon SELECT on base tables)
 - Stripe webhooks updating subscription state
 - Internal maintenance jobs
 - Verification reconciliation (if absolutely required)
 
-Directory reads and user-owned writes should use anon client with user's JWT.
+User-owned writes should use anon client with user's JWT (or get_rls_client).
 Later, you'll likely build request-scoped clients with user JWT attached
 so PostgREST enforces RLS as that user.
 """
