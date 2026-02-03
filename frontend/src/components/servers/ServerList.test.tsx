@@ -3,12 +3,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ServerList } from './ServerList'
-import type { DirectoryResponse, DirectoryServer } from '@/types'
+import type { DirectoryServer } from '@/types'
 import type { ServerFilters } from './ServerFilters'
 
 // Mock the useServers hook
@@ -26,8 +26,11 @@ function createMockServer(overrides?: Partial<DirectoryServer>): DirectoryServer
         description: 'Test description',
         map_name: 'The Island',
         join_address: '123.456.789.0:7777',
+        join_password: null,
         join_instructions_pc: null,
         join_instructions_console: null,
+        discord_url: null,
+        website_url: null,
         mod_list: [],
         rates: null,
         wipe_info: null,
@@ -45,12 +48,26 @@ function createMockServer(overrides?: Partial<DirectoryServer>): DirectoryServer
         players_current: 10,
         players_capacity: 50,
         players_max: 50,
+        quality_score: null,
+        uptime_24h: null,
+        uptime_percent: null,
+        rank: null,
+        rank_position: null,
+        rank_by: null,
+        rank_delta_24h: null,
         game_mode: 'pvp',
         ruleset: 'boosted',
+        server_type: null,
         is_verified: true,
         is_new: false,
         is_stable: true,
         platforms: ['steam'],
+        is_official_plus: null,
+        is_modded: null,
+        is_crossplay: null,
+        is_console: null,
+        is_pc: null,
+        is_PC: null,
         ...overrides,
     }
 }

@@ -277,6 +277,26 @@ export async function apiRequest<T>(
 }
 
 // =============================================================================
+// Me / Terms acceptance (legal audit)
+// =============================================================================
+
+export interface TermsAcceptance {
+    terms_accepted_at: string | null
+    server_listing_terms_accepted_at: string | null
+}
+
+export async function getTermsAcceptance(): Promise<TermsAcceptance> {
+    return apiRequest<TermsAcceptance>('/api/v1/me/terms-acceptance')
+}
+
+export async function acceptTerms(acceptanceType: 'account' | 'server_listing'): Promise<{ ok: boolean }> {
+    return apiRequest<{ ok: boolean }>('/api/v1/me/terms-acceptance', {
+        method: 'POST',
+        body: JSON.stringify({ acceptance_type: acceptanceType }),
+    })
+}
+
+// =============================================================================
 // Favorites API
 // All require authentication. Use apiRequest which sends Bearer token.
 // =============================================================================

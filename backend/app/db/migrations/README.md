@@ -17,6 +17,10 @@ export DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.
 psql "$DATABASE_URL" -f backend/app/db/migrations/012_security_fixes.sql
 ```
 
+**Verification guides (after running specific migrations):**
+- `012_security_fixes_TEST.md` — Verify join_password and heartbeat payload/signature security
+- `013_sprint_6_hosting_provider_VERIFY.md` — Verify hosting_provider and directory_view
+
 ## Migration Files
 
 ### `001_sprint_0_schema.sql`
@@ -135,6 +139,27 @@ Only needed if the directory repo used the anon key. The backend now uses **serv
 Runs `ALTER VIEW ... SET (security_invoker = true)` on both views. Use this to clear the Supabase "SECURITY DEFINER" advisory without dropping/recreating the views. Backend directory API uses service_role, so directory listing keeps working.
 
 **To Run:** Copy contents into Supabase SQL Editor and execute.
+
+### `021_maps_table.sql`
+**Sprint 7 - Maps reference table**
+
+Creates `maps` table with official ASA map names (The Island, Scorched Earth, etc.) and seeds it. Used by `GET /api/v1/maps` for form dropdown and directory filter options. `servers.map_name` remains free text; no FK.
+
+**To Run:** Copy contents into Supabase SQL Editor and execute (after 020).
+
+### `022_server_discord_website.sql`
+**Sprint 7 - Discord and website URLs on servers**
+
+Adds `discord_url` and `website_url` to `servers` and recreates `directory_view` to include them.
+
+**To Run:** Copy contents into Supabase SQL Editor and execute (after 021).
+
+### `023_profiles_terms_acceptance.sql`
+**ToS acceptance tracking (legal audit)**
+
+Adds to `profiles`: `terms_accepted_at` (when user accepted ToS at account creation) and `server_listing_terms_accepted_at` (when user accepted ToS before adding first server). Used by GET/POST `/api/v1/me/terms-acceptance`.
+
+**To Run:** Copy contents into Supabase SQL Editor and execute (after 022).
 
 ### `012_security_fixes.sql`
 **Security Fixes - Critical Security Boundary Fixes**

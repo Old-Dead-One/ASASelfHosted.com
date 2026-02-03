@@ -57,3 +57,42 @@ Defined in `index.css` under `:root` and `.dark`; use via Tailwind semantic name
 - `input`, `border`
 
 Prefer these over hardcoded colors so dark/light and future themes stay consistent.
+
+---
+
+## Design Tokens Reference (detailed)
+
+### Semantic Colors
+| Token | Usage | Light Mode | Dark Mode |
+|-------|-------|------------|-----------|
+| `background` | Page background | White | Dark slate |
+| `foreground` | Primary text | Near black | Near white |
+| `card` | Card surfaces | White | Dark slate |
+| `muted` | Secondary backgrounds | Light gray | Dark gray |
+| `border` | Borders, dividers | Light gray | Dark gray |
+| `input` | Form inputs | Light gray | Dark gray |
+
+### Primary & Accent
+| Token | Usage | Color |
+|-------|-------|-------|
+| `primary` | Primary actions, links | Cyan (188° 85% 45%) |
+| `accent` | Hover states, highlights | Lighter cyan |
+| `ring` | Focus rings | Cyan |
+
+### Status Colors
+| Token | Usage |
+|-------|-------|
+| `destructive` | Errors, delete actions |
+| `success` | Success states, confirmations |
+| `warning` | Warnings, cautions |
+
+### Tactical Accents
+| Token | Usage |
+|-------|-------|
+| `gridline` | Subtle separators, grid lines |
+| `panel` | Registry panel surfaces |
+
+### Design Philosophy
+- **Classic Registry:** Clean typography, strong spacing and contrast, professional look.
+- **Tactical Sci-Fi accents:** Subtle ops-console vibe, cyan for technical elements, muted slate/graphite, thin separators and panels.
+- **Avoid:** Neon, heavy gradients, scanlines, HUD overload.

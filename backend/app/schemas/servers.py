@@ -32,6 +32,8 @@ class ServerCreateRequest(BaseSchema):
     join_password: str | None = None  # Owner-only, stored in server_secrets table
     join_instructions_pc: str | None = None
     join_instructions_console: str | None = None
+    discord_url: str | None = None
+    website_url: str | None = None
     
     # Server configuration
     mod_list: list[str] | None = None  # Array of mod IDs or names
@@ -89,6 +91,8 @@ class ServerUpdateRequest(BaseSchema):
     join_password: str | None = None  # Owner-only, stored in server_secrets table
     join_instructions_pc: str | None = None
     join_instructions_console: str | None = None
+    discord_url: str | None = None
+    website_url: str | None = None
     
     # Server configuration
     mod_list: list[str] | None = None  # Array of mod IDs or names

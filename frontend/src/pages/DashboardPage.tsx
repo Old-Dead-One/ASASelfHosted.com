@@ -14,11 +14,14 @@ import {
     createServer,
     updateServer,
     deleteServer,
+    getTermsAcceptance,
+    acceptTerms,
     APIErrorResponse,
 } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { ErrorMessage } from '@/components/ui/ErrorMessage'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { TermsAcceptanceModal } from '@/components/TermsAcceptanceModal'
 import type { DirectoryServer, Ruleset } from '@/types'
 
 type DashboardServer = Pick<
@@ -36,6 +39,8 @@ type DashboardServer = Pick<
     | 'join_password'
     | 'join_instructions_pc'
     | 'join_instructions_console'
+    | 'discord_url'
+    | 'website_url'
     | 'mod_list'
     | 'rates'
     | 'wipe_info'
@@ -75,6 +80,8 @@ function formDataToCreatePayload(data: ServerFormData): Record<string, unknown> 
         join_password: data.join_password?.trim() || null,
         join_instructions_pc: joinInstructions,
         join_instructions_console: joinInstructions,
+        discord_url: data.discord_url?.trim() || null,
+        website_url: data.website_url?.trim() || null,
         mod_list: modList && modList.length > 0 ? modList : null,
         rates: data.rates?.trim() || null,
         wipe_info: data.wipe_info?.trim() || null,
@@ -105,6 +112,8 @@ function formDataToUpdatePayload(data: ServerFormData): Record<string, unknown> 
         join_password: data.join_password?.trim() || null,
         join_instructions_pc: joinInstructions,
         join_instructions_console: joinInstructions,
+        discord_url: data.discord_url?.trim() || null,
+        website_url: data.website_url?.trim() || null,
         mod_list: modList && modList.length > 0 ? modList : null,
         rates: data.rates?.trim() || null,
         wipe_info: data.wipe_info?.trim() || null,
@@ -138,6 +147,8 @@ function serverToFormData(s: DashboardServer, excludeNameAddressAndMap = false):
         join_address: excludeNameAddressAndMap ? '' : (s.join_address ?? ''),
         join_password: s.join_password ?? '',
         join_instructions: s.join_instructions_pc || s.join_instructions_console || '',
+        discord_url: s.discord_url ?? '',
+        website_url: s.website_url ?? '',
         mod_list: modListString,
         rates: s.rates ?? '',
         wipe_info: s.wipe_info ?? '',
@@ -160,6 +171,9 @@ export function DashboardPage() {
     const [cloningServer, setCloningServer] = useState<DashboardServer | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<DashboardServer | null>(null)
     const [crudError, setCrudError] = useState<string | null>(null)
+    const [showServerListingTermsModal, setShowServerListingTermsModal] = useState(false)
+    const [serverListingTermsAgreed, setServerListingTermsAgreed] = useState(false)
+    const [serverListingTermsLoading, setServerListingTermsLoading] = useState(false)
 
     const servers = (myServers?.data ?? []) as DashboardServer[]
     const showList = !showCreateForm && !editingServer && !cloningServer
@@ -267,6 +281,40 @@ export function DashboardPage() {
         },
         []
     )
+
+    const handleAddServerClick = useCallback(() => {
+        setCloningServer(null)
+        setCrudError(null)
+        if (servers.length === 0) {
+            getTermsAcceptance()
+                .then((r) => {
+                    if (r.server_listing_terms_accepted_at) {
+                        setShowCreateForm(true)
+                    } else {
+                        setServerListingTermsAgreed(false)
+                        setShowServerListingTermsModal(true)
+                    }
+                })
+                .catch(() => setShowCreateForm(true))
+        } else {
+            setShowCreateForm(true)
+        }
+    }, [servers.length])
+
+    const handleServerListingTermsContinue = useCallback(async () => {
+        if (!serverListingTermsAgreed) return
+        setServerListingTermsLoading(true)
+        try {
+            await acceptTerms('server_listing')
+            setShowServerListingTermsModal(false)
+            setServerListingTermsAgreed(false)
+            setShowCreateForm(true)
+        } catch {
+            setCrudError('Could not record terms acceptance. Please try again.')
+        } finally {
+            setServerListingTermsLoading(false)
+        }
+    }, [serverListingTermsAgreed])
 
     return (
         <div className="py-8">
@@ -381,10 +429,7 @@ export function DashboardPage() {
                             <div className="-mx-4">
                                 <DashboardServersCarousel
                                     servers={servers}
-                                    onAddServer={() => {
-                                        setCloningServer(null)
-                                        setShowCreateForm(true)
-                                    }}
+                                    onAddServer={handleAddServerClick}
                                     onEdit={setEditingServer}
                                     onClone={handleCloneServer}
                                 />
@@ -432,6 +477,19 @@ export function DashboardPage() {
                     </div>
                 </div>
             )}
+
+            <TermsAcceptanceModal
+                open={showServerListingTermsModal}
+                agreed={serverListingTermsAgreed}
+                onAgreedChange={setServerListingTermsAgreed}
+                onContinue={handleServerListingTermsContinue}
+                onCancel={() => {
+                    setShowServerListingTermsModal(false)
+                    setServerListingTermsAgreed(false)
+                }}
+                continueLabel="I agree — continue to add server"
+                loading={serverListingTermsLoading}
+            />
 
             <section
                 className="rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 mt-4"

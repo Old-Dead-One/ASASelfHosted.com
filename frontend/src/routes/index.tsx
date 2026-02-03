@@ -14,6 +14,15 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { VerificationPage } from '@/pages/VerificationPage'
+import { ConsentPage } from '@/pages/ConsentPage'
+import { PrivacyPage } from '@/pages/PrivacyPage'
+import { TermsPage } from '@/pages/TermsPage'
+import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage'
+import { DataRightsPage } from '@/pages/DataRightsPage'
+import { ContactPage } from '@/pages/ContactPage'
+import { FaqPage } from '@/pages/FaqPage'
+import { AboutPage } from '@/pages/AboutPage'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
 export const router = createBrowserRouter([
@@ -52,6 +61,42 @@ export const router = createBrowserRouter([
                         <DashboardPage />
                     </ProtectedRoute>
                 ),
+            },
+            {
+                path: 'verification',
+                element: <VerificationPage />,
+            },
+            {
+                path: 'consent',
+                element: <ConsentPage />,
+            },
+            {
+                path: 'privacy',
+                element: <PrivacyPage />,
+            },
+            {
+                path: 'terms',
+                element: <TermsPage />,
+            },
+            {
+                path: 'privacy-policy',
+                element: <PrivacyPolicyPage />,
+            },
+            {
+                path: 'data-rights',
+                element: <DataRightsPage />,
+            },
+            {
+                path: 'contact',
+                element: <ContactPage />,
+            },
+            {
+                path: 'faq',
+                element: <FaqPage />,
+            },
+            {
+                path: 'about',
+                element: <AboutPage />,
             },
             {
                 path: '404',

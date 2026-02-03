@@ -31,6 +31,8 @@ type DashboardServer = Pick<
     | 'join_password'
     | 'join_instructions_pc'
     | 'join_instructions_console'
+    | 'discord_url'
+    | 'website_url'
     | 'mod_list'
     | 'rates'
     | 'wipe_info'

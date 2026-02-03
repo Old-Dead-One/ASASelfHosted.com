@@ -226,9 +226,17 @@ class SupabaseDirectoryRepository(DirectoryRepository):
 
         # Build query from directory_view
         # Explicitly select columns matching DirectoryServer schema (minus rank fields computed in backend)
-        # This prevents failures if view accidentally includes extra columns (extra="forbid" in BaseSchema)
-        # Select ruleset only; directory_view may not have rulesets (migration 015). We derive rulesets from ruleset below.
-        select_columns = (
+        # Omit discord_url, website_url in list so it works before migration 022; set None on each row below
+        select_columns_full = (
+            "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
+            "discord_url,website_url,"
+            "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
+            "created_at,updated_at,cluster_id,cluster_name,cluster_slug,cluster_visibility,"
+            "favorite_count,is_verified,is_new,is_stable,ruleset,game_mode,server_type,"
+            "platforms,is_official_plus,is_modded,is_crossplay,is_console,is_pc,"
+            "players_current,players_capacity,quality_score,uptime_percent"
+        )
+        select_columns_without_discord_website = (
             "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
             "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
             "created_at,updated_at,cluster_id,cluster_name,cluster_slug,cluster_visibility,"
@@ -236,7 +244,8 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             "platforms,is_official_plus,is_modded,is_crossplay,is_console,is_pc,"
             "players_current,players_capacity,quality_score,uptime_percent"
         )
-        # No count needed for cursor pagination
+        # Omit discord_url, website_url so list works before migration 022; set None on each row below
+        select_columns = select_columns_without_discord_website
         query = self._supabase.table("directory_view").select(select_columns)
 
         # Apply search filter (q parameter)
@@ -441,6 +450,11 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         last_row = None
         for row in data:
             try:
+                # Ensure discord_url, website_url present (not selected before migration 022)
+                if "discord_url" not in row:
+                    row["discord_url"] = None
+                if "website_url" not in row:
+                    row["website_url"] = None
                 # Normalize array fields (handle Postgres array string format if needed)
                 # DirectoryServer requires list, not Optional or string
                 row["mod_list"] = self._normalize_array_field(row.get("mod_list"))
@@ -649,6 +663,7 @@ class SupabaseDirectoryRepository(DirectoryRepository):
             # Try with join_password first (if migration 014 has been run)
             select_columns_with_password = (
                 "id,name,description,map_name,join_address,join_password,join_instructions_pc,join_instructions_console,"
+                "discord_url,website_url,"
                 "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
                 "created_at,updated_at,cluster_id,cluster_name,cluster_slug,cluster_visibility,"
                 "favorite_count,is_verified,is_new,is_stable,ruleset,game_mode,server_type,"
@@ -707,11 +722,17 @@ class SupabaseDirectoryRepository(DirectoryRepository):
         except Exception as e:
             from postgrest.exceptions import APIError as PostgrestAPIError
 
-            # If join_password or rulesets column doesn't exist (migration 014/015 not run), retry without them
+            # If join_password, rulesets, or discord/website columns don't exist (migrations 014/015/022), retry without them
             if isinstance(e, PostgrestAPIError) and (
-                e.code == "42703" and ("join_password" in str(e) or "rulesets" in str(e))
+                e.code == "42703"
+                and (
+                    "join_password" in str(e)
+                    or "rulesets" in str(e)
+                    or "discord_url" in str(e)
+                    or "website_url" in str(e)
+                )
             ):
-                # Retry without join_password and without rulesets
+                # Retry without join_password, rulesets, discord_url, website_url
                 select_columns_without_password = (
                     "id,name,description,map_name,join_address,join_instructions_pc,join_instructions_console,"
                     "mod_list,rates,wipe_info,effective_status,status_source,last_seen_at,confidence,"
@@ -733,8 +754,13 @@ class SupabaseDirectoryRepository(DirectoryRepository):
                     return None
                 
                 row = data[0]
-                # Add join_password as None since column doesn't exist
-                row["join_password"] = None
+                # Add join_password, discord_url, website_url as None (omitted from select when columns don't exist)
+                if "join_password" not in row:
+                    row["join_password"] = None
+                if "discord_url" not in row:
+                    row["discord_url"] = None
+                if "website_url" not in row:
+                    row["website_url"] = None
                 # rulesets may not exist in view; derive from ruleset
                 if "rulesets" not in row and row.get("ruleset"):
                     row["rulesets"] = [row["ruleset"]]

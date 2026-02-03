@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ServerFilters } from './ServerFilters'
-import type { ServerFilters as ServerFiltersType } from './ServerFilters'
 
 describe('ServerFilters', () => {
     const mockOnFiltersChange = vi.fn()

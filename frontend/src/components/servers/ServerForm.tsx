@@ -4,10 +4,13 @@
  * Form for creating/editing server listings.
  */
 
-import { useState, FormEvent, useEffect, useCallback } from 'react'
+import { useState, FormEvent, useEffect, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { ServerStatus, GameMode, Ruleset } from '@/types'
-import { listMyClusters, type Cluster, resolveMods, type ResolvedMod } from '@/lib/api'
+import { listMyClusters, type Cluster, resolveMods, type ResolvedMod, apiRequest } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
+
+const OTHER_MAP_VALUE = '__other__'
 
 export type PlatformChoice = 'pc' | 'console' | 'crossplay'
 
@@ -30,6 +33,8 @@ export interface ServerFormData {
     join_address: string
     join_password: string
     join_instructions: string
+    discord_url: string
+    website_url: string
     mod_list: string
     rates: string
     wipe_info: string
@@ -64,6 +69,8 @@ export function ServerForm({
         join_address: initialData?.join_address || '',
         join_password: initialData?.join_password || '',
         join_instructions: initialData?.join_instructions !== undefined ? initialData.join_instructions : DEFAULT_JOIN_INSTRUCTIONS,
+        discord_url: initialData?.discord_url || '',
+        website_url: initialData?.website_url || '',
         mod_list: initialData?.mod_list || '',
         rates: initialData?.rates || '',
         wipe_info: initialData?.wipe_info || '',
@@ -81,6 +88,19 @@ export function ServerForm({
     const [resolvedMods, setResolvedMods] = useState<ResolvedMod[]>([])
     const [resolvingMods, setResolvingMods] = useState(false)
     const [modResolveError, setModResolveError] = useState<string | null>(null)
+
+    const { data: mapsData } = useQuery({
+        queryKey: ['maps'],
+        queryFn: async () => apiRequest<{ data: { id: string; name: string }[] }>('/api/v1/maps'),
+        staleTime: 300_000,
+    })
+    const mapOptions = mapsData?.data ?? []
+    const mapSelectValue = useMemo(() => {
+        const name = formData.map_name.trim()
+        if (!name) return ''
+        const found = mapOptions.find((m) => m.name === name)
+        return found ? found.name : OTHER_MAP_VALUE
+    }, [formData.map_name, mapOptions])
 
     // Load clusters on mount
     useEffect(() => {
@@ -173,7 +193,39 @@ export function ServerForm({
                         </div>
                         <div>
                             <label htmlFor="map_name" className="label-tek">Map <span className={!formData.map_name.trim() ? 'text-destructive' : ''}>*</span></label>
-                            <input id="map_name" type="text" value={formData.map_name} onChange={(e) => setFormData({ ...formData, map_name: e.target.value })} required maxLength={80} className="input-tek" />
+                            <select
+                                id="map_name"
+                                value={mapSelectValue}
+                                onChange={(e) => {
+                                    const v = e.target.value
+                                    if (v === OTHER_MAP_VALUE || v === '') {
+                                        setFormData({ ...formData, map_name: v === OTHER_MAP_VALUE ? (mapOptions.some((m) => m.name === formData.map_name) ? '' : formData.map_name) : '' })
+                                    } else {
+                                        setFormData({ ...formData, map_name: v })
+                                    }
+                                }}
+                                required
+                                className="input-tek"
+                            >
+                                <option value="">Select...</option>
+                                {mapOptions.map((m) => (
+                                    <option key={m.id} value={m.name}>
+                                        {m.name}
+                                    </option>
+                                ))}
+                                <option value={OTHER_MAP_VALUE}>Other</option>
+                            </select>
+                            {mapSelectValue === OTHER_MAP_VALUE && (
+                                <input
+                                    type="text"
+                                    aria-label="Custom map name"
+                                    placeholder="Enter map name"
+                                    value={formData.map_name}
+                                    onChange={(e) => setFormData({ ...formData, map_name: e.target.value })}
+                                    maxLength={80}
+                                    className="input-tek mt-2"
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -375,9 +427,19 @@ export function ServerForm({
                         </div>
                     </div>
 
-                    <div>
-                        <label htmlFor="join_password" className="label-tek">Join Password (optional, visible to players)</label>
-                        <input id="join_password" type="text" value={formData.join_password} onChange={(e) => setFormData({ ...formData, join_password: e.target.value })} placeholder="Leave empty if none" maxLength={64} className="input-tek" />
+                    <div className={`grid grid-cols-1 md:grid-cols-3 ${FORM_GAP} md:items-start`}>
+                        <div>
+                            <label htmlFor="join_password" className="label-tek">Join Password (optional)</label>
+                            <input id="join_password" type="text" value={formData.join_password} onChange={(e) => setFormData({ ...formData, join_password: e.target.value })} placeholder="Leave empty if none" maxLength={64} className="input-tek w-full" />
+                        </div>
+                        <div>
+                            <label htmlFor="discord_url" className="label-tek">Discord URL (optional)</label>
+                            <input id="discord_url" type="url" value={formData.discord_url} onChange={(e) => setFormData({ ...formData, discord_url: e.target.value })} placeholder="https://discord.gg/..." maxLength={512} className="input-tek w-full" />
+                        </div>
+                        <div>
+                            <label htmlFor="website_url" className="label-tek">Website URL (optional)</label>
+                            <input id="website_url" type="url" value={formData.website_url} onChange={(e) => setFormData({ ...formData, website_url: e.target.value })} placeholder="https://..." maxLength={512} className="input-tek w-full" />
+                        </div>
                     </div>
 
                     <div>

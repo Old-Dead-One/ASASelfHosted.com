@@ -44,6 +44,8 @@ export interface DirectoryServer {
     join_password: string | null  // Server password (public, visible to all players)
     join_instructions_pc: string | null
     join_instructions_console: string | null
+    discord_url: string | null
+    website_url: string | null
 
     // Server configuration
     mod_list: string[] // Always a list, never null

@@ -154,7 +154,7 @@ All API responses follow a consistent format:
 ## Documentation
 
 - `DEV_NOTES.md` - Development notes, decisions, and context (referenced during development)
-- `PROJECT_STRUCTURE.md` - Complete file and folder structure (updated after Sprint 4)
+- `docs/design/PROJECT_STRUCTURE.md` - File and folder structure
 - `VERIFICATION.md` - Setup and verification checklist
 - `INSTALL.md` - Installation instructions
 - `SUPABASE_SETUP.md` - Supabase project setup and migration guide

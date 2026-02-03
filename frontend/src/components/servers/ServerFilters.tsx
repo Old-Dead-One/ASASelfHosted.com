@@ -5,7 +5,9 @@
  */
 
 import { useState, FormEvent, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { ServerStatus, VerificationMode, GameMode, Ruleset, SortOrder, RankBy, DirectoryView, TriState } from '@/types'
+import { apiRequest } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 
 /** Platform filter: PC Only, Console Only, or Crossplay. Maps to backend pc/console/crossplay params. */
@@ -27,6 +29,8 @@ export interface ServerFilters {
     is_cluster?: TriState
     /** Filter by platform: PC Only, Console Only, or Crossplay */
     platform?: PlatformFilter
+    /** Filter by map name (single select from known maps). */
+    map_name?: string
 }
 
 interface ServerFiltersProps {
@@ -53,6 +57,13 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
         onFiltersChange(resetFilters)
     }
 
+    const { data: mapsData } = useQuery({
+        queryKey: ['maps'],
+        queryFn: async () => apiRequest<{ data: { id: string; name: string }[] }>('/api/v1/maps'),
+        staleTime: 300_000,
+    })
+    const mapOptions = mapsData?.data ?? []
+
     const hasActiveFilters = !!(
         filters.q ||
         filters.status ||
@@ -60,7 +71,8 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
         filters.game_mode ||
         filters.ruleset ||
         filters.is_cluster ||
-        filters.platform
+        filters.platform ||
+        filters.map_name
     )
 
     return (
@@ -96,9 +108,9 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                     onSubmit={handleSubmit}
                     className="card-elevated p-4 space-y-3"
                 >
-                    {/* Row 1: Search | Cluster | Status (left to right); same 6-col grid as row 2 for alignment */}
+                    {/* Row 1: Search | Map | Cluster | Status */}
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-                        <div className="lg:col-span-4">
+                        <div className="lg:col-span-3">
                             <label htmlFor="search" className="label-tek">Search</label>
                             <input
                                 id="search"
@@ -108,6 +120,29 @@ export function ServerFilters({ filters, onFiltersChange }: ServerFiltersProps) 
                                 placeholder="Search servers..."
                                 className="input-tek"
                             />
+                        </div>
+                        <div>
+                            <label htmlFor="map_name" className="label-tek">
+                                Map
+                            </label>
+                            <select
+                                id="map_name"
+                                value={localFilters.map_name || ''}
+                                onChange={(e) =>
+                                    setLocalFilters({
+                                        ...localFilters,
+                                        map_name: e.target.value || undefined,
+                                    })
+                                }
+                                className="input-tek w-full"
+                            >
+                                <option value="">All</option>
+                                {mapOptions.map((m) => (
+                                    <option key={m.id} value={m.name}>
+                                        {m.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label htmlFor="is_cluster" className="label-tek">

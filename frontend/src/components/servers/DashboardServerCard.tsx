@@ -8,6 +8,7 @@
 import { Link } from 'react-router-dom'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Button } from '@/components/ui/Button'
+import { TekCardSurface } from '@/components/servers/TekCardSurface'
 import type { DirectoryServer, ServerStatus } from '@/types'
 
 interface DashboardServerCardProps {
@@ -26,6 +27,8 @@ interface DashboardServerCardProps {
         | 'join_password'
         | 'join_instructions_pc'
         | 'join_instructions_console'
+        | 'discord_url'
+        | 'website_url'
         | 'mod_list'
         | 'rates'
         | 'wipe_info'
@@ -41,10 +44,7 @@ export function DashboardServerCard({ server, onEdit, onClone }: DashboardServer
     const status = (server.effective_status ?? 'unknown') as ServerStatus
 
     return (
-        <div className="relative overflow-hidden rounded-lg tek-border w-full min-w-0 hover:border-primary/30 transition-colors h-full flex flex-col min-h-[260px]">
-            <div className="absolute inset-0 bg-tek-wall" aria-hidden />
-            <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
-            <div className="relative p-3 bg-background/65 backdrop-blur-[1px] flex flex-col flex-1">
+        <TekCardSurface className="w-full min-w-0 min-h-[260px]" contentClassName="p-3">
                 <div className="flex flex-col flex-1 gap-2">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -107,7 +107,6 @@ export function DashboardServerCard({ server, onEdit, onClone }: DashboardServer
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+        </TekCardSurface>
     )
 }

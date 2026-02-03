@@ -16,6 +16,8 @@ from app.api.v1 import (
     directory,
     favorites,
     heartbeat,
+    maps,
+    me,
     mods,
     servers,
     subscriptions,
@@ -29,12 +31,14 @@ router = APIRouter()
 # Include all domain routers
 # Directory router (read-only, public)
 router.include_router(directory.router)
+router.include_router(maps.router)
 # Server router (CRUD, owner-managed)
 router.include_router(servers.router)
 # Favorites router (nested under servers)
 router.include_router(favorites.router)
 router.include_router(clusters.router)
 router.include_router(verification.router)
+router.include_router(me.router)
 router.include_router(heartbeat.router)
 router.include_router(consent.router)
 router.include_router(mods.router)

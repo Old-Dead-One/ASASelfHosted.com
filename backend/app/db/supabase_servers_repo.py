@@ -62,6 +62,10 @@ class SupabaseServersRepository(ServersRepository):
             insert_data["join_instructions_pc"] = server_data.join_instructions_pc.strip()
         if server_data.join_instructions_console:
             insert_data["join_instructions_console"] = server_data.join_instructions_console.strip()
+        if server_data.discord_url is not None:
+            insert_data["discord_url"] = server_data.discord_url.strip() or None
+        if server_data.website_url is not None:
+            insert_data["website_url"] = server_data.website_url.strip() or None
         
         # Server configuration
         if server_data.mod_list is not None:
@@ -342,6 +346,10 @@ class SupabaseServersRepository(ServersRepository):
             update_data["join_instructions_pc"] = server_data.join_instructions_pc.strip() if server_data.join_instructions_pc else None
         if server_data.join_instructions_console is not None:
             update_data["join_instructions_console"] = server_data.join_instructions_console.strip() if server_data.join_instructions_console else None
+        if server_data.discord_url is not None:
+            update_data["discord_url"] = server_data.discord_url.strip() or None
+        if server_data.website_url is not None:
+            update_data["website_url"] = server_data.website_url.strip() or None
         
         # Server configuration
         if server_data.mod_list is not None:
@@ -485,6 +493,8 @@ class SupabaseServersRepository(ServersRepository):
             join_password=row.get("join_password"),
             join_instructions_pc=row.get("join_instructions_pc"),
             join_instructions_console=row.get("join_instructions_console"),
+            discord_url=row.get("discord_url"),
+            website_url=row.get("website_url"),
             mod_list=mod_list,
             rates=row.get("rates"),
             wipe_info=row.get("wipe_info"),

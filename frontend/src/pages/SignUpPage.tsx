@@ -2,17 +2,20 @@
  * Sign up page.
  *
  * Handles user registration (Supabase Auth or dev bypass).
+ * Requires ToS acceptance before creating account; records acceptance in DB for legal audit.
  */
 
 import { useState, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { acceptTerms } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 
 export function SignUpPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [agreedToTerms, setAgreedToTerms] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [showConfirmation, setShowConfirmation] = useState(false)
@@ -32,13 +35,20 @@ export function SignUpPage() {
             return
         }
 
+        if (!agreedToTerms) {
+            setError('You must agree to the Terms of Service to continue.')
+            return
+        }
+
         setLoading(true)
 
         try {
             await signUp(email, password)
-            // Check if email confirmation is required
-            // Supabase may require email confirmation depending on project settings
-            // If confirmation is required, show confirmation message instead of redirecting
+            try {
+                await acceptTerms('account')
+            } catch {
+                // Account created; terms recording is best-effort (e.g. backend not configured)
+            }
             setShowConfirmation(true)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to sign up')
@@ -161,11 +171,43 @@ export function SignUpPage() {
                             />
                         </div>
 
+                        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+                            <p className="text-sm font-semibold text-foreground">
+                                Before continuing, please review and accept the Terms of Service.
+                            </p>
+                            <p className="text-xs font-medium text-foreground">Key points:</p>
+                            <ul className="list-disc pl-5 space-y-1 text-xs text-muted-foreground">
+                                <li>ASA Self-Hosted lists servers but does not run or control them.</li>
+                                <li>Verification confirms server identity, not quality or safety.</li>
+                                <li>Data is not collected by default.</li>
+                                <li>Player data requires explicit, in-game consent.</li>
+                                <li>If you did not grant permission in-game, we do not have your data.</li>
+                            </ul>
+                            <p className="text-xs text-muted-foreground">
+                                You must agree to the Terms of Service to continue.
+                            </p>
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-input bg-background shadow-sm focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    aria-describedby="signup-tos-desc"
+                                />
+                                <span id="signup-tos-desc" className="text-sm text-foreground">
+                                    I agree to the Terms of Service and understand how consent and data collection work.
+                                </span>
+                            </label>
+                            <p className="text-xs text-muted-foreground">
+                                Full text: <Link to="/terms" className="text-primary hover:text-accent underline" target="_blank" rel="noopener noreferrer">Terms of Service</Link>
+                            </p>
+                        </div>
+
                         <Button
                             type="submit"
                             variant="primary"
                             className="w-full min-h-[44px]"
-                            disabled={loading}
+                            disabled={!agreedToTerms || loading}
                             aria-label="Sign up"
                         >
                             {loading ? 'Creating account...' : 'Sign Up'}

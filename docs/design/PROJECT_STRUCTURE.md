@@ -1,35 +1,46 @@
 # Project Structure
 
-Complete file and folder structure for ASASelfHosted.com development.
+File and folder structure for ASASelfHosted.com development. For a full index of working docs, see **docs/WORKING_DOCS.md**.
 
-**Last Updated:** After Sprint 4 cleanup and Sprint 5 planning
+**Last Updated:** 2026-02-02
 
 ## Root Level Files
 
 ```
 asaselfhosted.com/
-├── backend/              # FastAPI backend
-├── frontend/            # React frontend
-├── 1_DESCRIPTION.txt     # Project description
-├── 2_FEATURE_LIST.txt    # Feature list (definitive MVP scope)
-├── 3_TECH_STACK.txt      # Technology stack
-├── 4_Dev_Plan.txt        # Development plan
-├── DECISIONS.md          # Official decisions (override design docs)
-├── DESIGN_DOC_COMPARISON.md  # Design document comparison
-├── DEV_NOTES.md          # Development notes and context
-├── GIT_SETUP.md          # Git setup and workflow
-├── INSTALL.md            # Installation instructions
-├── PROJECT_STRUCTURE.md  # This file
-├── README.md             # Project overview
-├── SPRINT_1_COMPLETION_CHECKLIST.md  # Sprint 1 completion tracking
-├── SPRINT_ONE_PLAYBOOK.txt           # Sprint 1 playbook
-├── SPRINT_TWO_PLAYBOOK.md            # Sprint 2 playbook
-├── SPRINT_THREE_PLAYBOOK.txt         # Sprint 3 playbook
-├── SPRINT_FOUR_PLAYBOOK.txt          # Sprint 4 playbook
-├── SPRINT_FIVE_PLAYBOOK.txt          # Sprint 5 playbook
-├── SPRINT_5_IMPLEMENTATION_PLAN.md   # Sprint 5 implementation plan
-├── SUPABASE_SETUP.md     # Supabase setup guide
-└── VERIFICATION.md       # Setup verification checklist
+├── backend/                 # FastAPI backend
+├── frontend/                 # React frontend
+├── docs/                     # Working docs and reference (see WORKING_DOCS.md)
+│   └── design/               # Canonical design docs (1_DESCRIPTION.txt … 5_Appendix.txt)
+├── DECISIONS.md              # Official decisions (override design docs)
+├── DEV_NOTES.md              # Dev context, ports, workflow; links to DECISIONS
+├── FinalCheck.md             # Pre-launch checklist
+├── GAP_ANALYSIS.md           # Implementation vs design; MVP analysis
+├── INSTALL.md                # Installation instructions
+├── README.md                 # Project overview
+├── SPRINT_8_TODO.md          # Single backlog (all open items)
+├── SUPABASE_SETUP.md         # Supabase setup guide
+```
+
+## Docs (docs/)
+
+```
+docs/
+├── WORKING_DOCS.md            # Index of all working docs (start here)
+├── design/                    # Canonical product scope
+│   ├── 1_DESCRIPTION.txt      # Project vision
+│   ├── 2_FEATURE_LIST.txt    # Feature list (MVP scope)
+│   ├── 3_TECH_STACK.txt      # Tech stack
+│   ├── 4_Dev_Plan.txt         # Development plan
+│   ├── 5_Appendix.txt         # Appendix (competitive ref, page architecture)
+│   ├── PROJECT_STRUCTURE.md   # This file
+│   └── README.md              # Design docs index
+├── RANKING.md                 # Ranking/sort contract (rank_by, quality_score)
+├── REFERENCE_SCHEMA_SPRINT0_TO_5.md
+├── SERVER_IMAGES.md           # Server images feature spec
+├── Trust_Claims_Audit.md      # Trust claims vs enforcement (audits)
+├── TRUST_PAGES.md             # Trust pages (/verification, /consent) content spec
+└── STEAM_OAUTH_TODO.md        # Steam OAuth implementation notes
 ```
 
 ## Backend Structure
@@ -157,8 +168,7 @@ frontend/
 │   │   ├── api.ts         # API client (standardized error handling)
 │   │   ├── dev-auth.ts    # Dev auth utilities (Sprint 1+)
 │   │   ├── query-client.ts # TanStack Query client
-│   │   ├── utils.ts       # General utilities
-│   │   └── tokens.md      # Token documentation
+│   │   └── utils.ts       # General utilities
 │   ├── types/             # TypeScript type definitions
 │   │   └── index.ts      # Directory server types (matches backend)
 │   ├── routes/            # Routing (when router is added)
@@ -297,10 +307,10 @@ frontend/
 - Tests: Replaced stub tests with real hermetic tests
 - CI: Updated for test environment gating
 
-**Ready for Sprint 5:**
-- Directory read APIs hardening
-- Ranking & scoring predictability
-- Anti-gaming guards
-- Snapshot consistency
-- Observability improvements
-- Comprehensive test expansion
+**Sprint 5–7 Complete:**
+- Directory ranking, quality score, facets; maps table; Discord/website URLs
+- Trust pages (Verification, Consent, Legal, Data Rights, Contact, Terms, About, FAQ)
+- SpotlightCarousel (selection locked, wrap-around); TekCardSurface; server CRUD + favorites
+- GAP_ANALYSIS and MVP analysis updated; Sprint 8 TODO is the active backlog
+
+**Current focus:** See SPRINT_8_TODO.md and docs/WORKING_DOCS.md.

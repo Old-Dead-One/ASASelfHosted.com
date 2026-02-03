@@ -19,7 +19,7 @@ export function Layout() {
                 Skip to main content
             </a>
             <Header />
-            <main id="main-content" className="flex-1" role="main">
+            <main id="main-content" className="flex-1 pb-24" role="main">
                 <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8">
                     <Outlet />
                 </div>

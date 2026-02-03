@@ -63,6 +63,8 @@ class DirectoryServer(BaseSchema):
     join_password: str | None = None  # Server password (public, visible to all players)
     join_instructions_pc: str | None = None
     join_instructions_console: str | None = None
+    discord_url: str | None = None
+    website_url: str | None = None
 
     # Server configuration
     mod_list: list[str] = Field(default_factory=list)  # Always a list, never None

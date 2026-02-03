@@ -124,10 +124,10 @@
 
 ## Reference Documents
 
-- `1_DESCRIPTION.txt` - Project description
-- `2_FEATURE_LIST.txt` - **Definitive MVP scope** (90% MVP Scope Lock)
-- `3_TECH_STACK.txt` - Technology stack
-- `4_Dev_Plan.txt` - Development plan (secondary, useful for sequencing)
+- `docs/design/1_DESCRIPTION.txt` - Project description
+- `docs/design/2_FEATURE_LIST.txt` - **Definitive MVP scope** (90% MVP Scope Lock)
+- `docs/design/3_TECH_STACK.txt` - Technology stack
+- `docs/design/4_Dev_Plan.txt` - Development plan (secondary, useful for sequencing)
 
 ---
 
@@ -147,7 +147,7 @@
 - Supports key rotation via `key_version`
 - Better for cluster identity and multi-server clusters
 
-**Note:** `4_Dev_Plan.txt` mentions HMAC with agent token (line 106), but Ed25519 cluster-based approach is the correct long-term solution and aligns with the cluster key model.
+**Note:** `docs/design/4_Dev_Plan.txt` mentions HMAC with agent token (line 106), but Ed25519 cluster-based approach is the correct long-term solution and aligns with the cluster key model.
 
 ---
 

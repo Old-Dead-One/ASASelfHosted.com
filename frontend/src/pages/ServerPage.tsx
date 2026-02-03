@@ -404,7 +404,7 @@ export function ServerPage() {
                     </div>
                 </div>
 
-                {(server.join_address || server.join_password || server.join_instructions_pc || server.join_instructions_console || server.is_pc !== null || server.is_console !== null || server.is_crossplay !== null) && (
+                {(server.join_address || server.join_password || server.discord_url || server.website_url || server.join_instructions_pc || server.join_instructions_console || server.is_pc !== null || server.is_console !== null || server.is_crossplay !== null) && (
                     <div className="relative overflow-hidden rounded-lg tek-border">
                         <div className="absolute inset-0 bg-tek-wall" aria-hidden />
                         <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
@@ -413,7 +413,7 @@ export function ServerPage() {
                                 Join Instructions
                             </h2>
                             {(server.is_pc !== null || server.is_console !== null || server.is_crossplay !== null) && (
-                                <div className="mb-2">
+                                <div className="mb-3">
                                     <dt className="text-sm font-medium text-muted-foreground mb-1">Platform</dt>
                                     <dd className="text-sm text-foreground">
                                         {(() => {
@@ -431,14 +431,52 @@ export function ServerPage() {
                                     </dd>
                                 </div>
                             )}
-                            {server.join_address && (
-                                <div className="mb-2">
-                                    <CopyableAddress value={server.join_address} label="Server Address" />
+                            {(server.discord_url || server.website_url) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    {server.discord_url && (
+                                        <div>
+                                            <dt className="text-sm font-medium text-muted-foreground mb-0.5">Discord</dt>
+                                            <dd className="text-sm">
+                                                <a
+                                                    href={server.discord_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5 break-all"
+                                                >
+                                                    {server.discord_url}
+                                                </a>
+                                            </dd>
+                                        </div>
+                                    )}
+                                    {server.website_url && (
+                                        <div>
+                                            <dt className="text-sm font-medium text-muted-foreground mb-0.5">Website</dt>
+                                            <dd className="text-sm">
+                                                <a
+                                                    href={server.website_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5 break-all"
+                                                >
+                                                    {server.website_url}
+                                                </a>
+                                            </dd>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                            {server.join_password && isAuthenticated && (
-                                <div className="mb-2">
-                                    <CopyableAddress value={server.join_password} label="Join Password" />
+                            {(server.join_address || (server.join_password && isAuthenticated)) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    {server.join_address && (
+                                        <div>
+                                            <CopyableAddress value={server.join_address} label="Server Address" />
+                                        </div>
+                                    )}
+                                    {server.join_password && isAuthenticated && (
+                                        <div>
+                                            <CopyableAddress value={server.join_password} label="Join Password" />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {(server.join_instructions_pc || server.join_instructions_console) && (

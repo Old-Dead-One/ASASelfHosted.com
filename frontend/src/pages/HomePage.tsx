@@ -26,6 +26,10 @@ export function HomePage() {
                     Public registry for self-hosted Ark: Survival Ascended servers
                 </p>
             </div>
+            {/* Spotlight Carousel — above directory */}
+            <section className="mb-8" aria-label="Spotlight servers">
+                <SpotlightCarousel />
+            </section>
             {/* Server Directory */}
             <section aria-labelledby="directory-heading" className="mb-4">
                 <ServerFilters filters={filters} onFiltersChange={setFilters} />
@@ -75,14 +79,6 @@ export function HomePage() {
                     )}
                 </div>
                 <ServerList filters={filters} />
-            </section>
-
-            {/* Spotlight Carousel */}
-            <section aria-labelledby="spotlight-heading" className="mb-8">
-                <h2 id="spotlight-heading" className="text-2xl font-semibold text-foreground mb-4">
-                    Spotlight
-                </h2>
-                <SpotlightCarousel />
             </section>
         </div>
     )

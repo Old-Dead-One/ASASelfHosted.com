@@ -47,6 +47,7 @@ function buildParams(filters?: ServerFilters, cursor?: string | null): URLSearch
     if (filters?.rank_by) params.set('rank_by', filters.rank_by ?? 'updated')
     if (filters?.order) params.set('order', filters.order ?? 'desc')
     if (filters?.view) params.set('view', filters.view)
+    if (filters?.map_name?.trim()) params.set('map_name', filters.map_name.trim())
     return params
 }
 
@@ -139,8 +140,8 @@ export function useServers(filters?: ServerFilters, options?: UseServersOptions)
         fetchNextPage: infiniteQuery.fetchNextPage,
         total,
         hasPreviousPage: false,
-        nextPage: () => {},
-        prevPage: () => {},
+        nextPage: () => { },
+        prevPage: () => { },
         pageNumber: 1,
         totalPages: undefined,
         isFetchingNextPage: infiniteQuery.isFetchingNextPage,

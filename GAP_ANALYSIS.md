@@ -1,16 +1,16 @@
 # Gap Analysis: Design Docs vs Current Implementation
 
-**Date**: 2026-01-26  
-**Status**: Post-Sprint 6 Review
+**Date**: 2026-02-02  
+**Status**: Post-Sprint 7 Review
 
 ---
 
 ## Executive Summary
 
-**MVP Completion**: ~75%  
-**Frontend**: ~95% complete (Sprint 6 done)  
-**Backend**: ~70% complete (core APIs done, CRUD stubbed)  
-**Agent**: 0% (not started)  
+**MVP Completion**: ~90% (web + trust; agent deferred)  
+**Frontend**: ~98% complete (Sprint 6 + Sprint 7: trust pages, SpotlightCarousel, maps, Discord/website URLs)  
+**Backend**: ~90% complete (core APIs, server CRUD, favorites, maps, directory facets)  
+**Agent**: 0% (not started; backend heartbeat ready)  
 **Discord Bot**: 0% (not started)
 
 ---
@@ -29,14 +29,12 @@
 | Manual - Cluster association | ✅ Complete | View-only, displayed |
 | Public server page | ✅ Complete | ServerPage with all details |
 | Join instructions (PC / Console) | ✅ Complete | Displayed on server page |
-| Password field | ⚠️ Partial | Moved to `server_secrets` (owner-only), no public password gating |
+| Password field | ✅ Complete | Account-gated: join password visible on server page only when user is authenticated (not favorite-gated) |
 | Search & filters | ✅ Complete | Full filter panel implemented |
-| Favorites (players) | ⚠️ Frontend only | UI exists, backend API missing |
+| Favorites (players) | ✅ Complete | UI + backend API (POST/DELETE favorites) |
 | Player accounts | ✅ Complete | Auth system in place |
 
-**Missing:**
-- ❌ Favorites backend API (`POST /api/v1/servers/{id}/favorites`, `DELETE /api/v1/servers/{id}/favorites`)
-- ⚠️ Password gating (favorite → reveal) - needs clarification on requirements
+**Note:** Password is account-gated (visible when authenticated). Favorites API is implemented.
 
 ---
 
@@ -64,7 +62,7 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Player profiles | ❌ Missing | No player profile pages |
-| Favorited servers | ⚠️ Partial | UI exists, backend missing |
+| Favorited servers | ✅ Complete | UI + backend; favorites persist |
 | Favorited clusters | ❌ Missing | Clusters not implemented |
 | Activity indicators | ❌ Missing | No activity tracking |
 | Optional public visibility | ❌ Missing | No player settings |
@@ -82,9 +80,9 @@
 | Stability | ❌ Not implemented | Phase 1.5 feature |
 | Activity | ❌ Not implemented | Phase 1.5 feature |
 | Hot / Up & Coming | ❌ Not implemented | Phase 1.5 feature |
-| Newbie Servers | ✅ Complete | Implemented in Sprint 6 |
+| Newbie Servers / Spotlight | ✅ Complete | SpotlightCarousel: verified + boosted, limit 8, wrap-around (criteria in SPRINT_8_TODO) |
 
-**Status**: MVP requirement (Newbie carousel) complete. Others are Phase 1.5+.
+**Status**: MVP requirement (one carousel) complete. Others are Phase 1.5+.
 
 ---
 
@@ -177,6 +175,13 @@
 | `GET /api/v1/directory/clusters` | ✅ Complete | Cluster listing |
 | `POST /api/v1/heartbeat` | ✅ Complete | Ed25519 verification, replay protection |
 | `GET /api/v1/health` | ✅ Complete | Health check |
+| `GET /api/v1/servers` | ✅ Complete | List owner's servers (auth required) |
+| `GET /api/v1/servers/{id}` | ✅ Complete | Get server (owner or public) |
+| `POST /api/v1/servers` | ✅ Complete | Create server (auth required) |
+| `PUT /api/v1/servers/{id}` | ✅ Complete | Update server (owner only) |
+| `DELETE /api/v1/servers/{id}` | ✅ Complete | Delete server (owner only) |
+| `POST /api/v1/servers/{id}/favorites` | ✅ Complete | Add favorite (auth required) |
+| `DELETE /api/v1/servers/{id}/favorites` | ✅ Complete | Remove favorite (auth required) |
 
 ---
 
@@ -184,12 +189,7 @@
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
-| `GET /api/v1/servers` | ❌ Stubbed | Returns empty array |
-| `GET /api/v1/servers/{id}` | ❌ Stubbed | Returns 404 |
-| `POST /api/v1/servers` | ❌ Stubbed | Returns "not yet implemented" |
-| `PUT /api/v1/servers/{id}` | ❌ Stubbed | Returns "not yet implemented" |
-| `DELETE /api/v1/servers/{id}` | ⚠️ Partial | Returns success but doesn't delete |
-| `GET /api/v1/clusters` | ❌ Stubbed | Returns empty array |
+| `GET /api/v1/clusters` | ❌ Stubbed | Returns empty array (directory clusters implemented) |
 | `GET /api/v1/clusters/{id}` | ❌ Stubbed | Returns 404 |
 | `POST /api/v1/clusters` | ❌ Stubbed | Returns "not yet implemented" |
 | `POST /api/v1/verification/initiate` | ❌ Stubbed | Not implemented |
@@ -199,8 +199,6 @@
 | `POST /api/v1/subscriptions/create-checkout` | ❌ Stubbed | Not implemented |
 | `POST /api/v1/subscriptions/cancel` | ❌ Stubbed | Not implemented |
 | `POST /api/v1/webhooks/stripe` | ❌ Stubbed | Not implemented |
-| `POST /api/v1/servers/{id}/favorites` | ❌ Missing | Favorites API not created |
-| `DELETE /api/v1/servers/{id}/favorites` | ❌ Missing | Favorites API not created |
 
 ---
 
@@ -210,7 +208,7 @@
 
 | Page | Status | Notes |
 |------|--------|-------|
-| Home | ✅ Complete | Newbie carousel + directory |
+| Home | ✅ Complete | SpotlightCarousel + directory |
 | Directory | ✅ Complete | Integrated into HomePage |
 | Server details | ✅ Complete | ServerPage with all features |
 | Login | ✅ Complete | Email/password auth |
@@ -222,51 +220,42 @@
 
 ---
 
+### ✅ Trust & Legal Pages (Sprint 7)
+
+| Page | Status | Notes |
+|------|--------|-------|
+| Verification | ✅ Complete | /verification — manual vs Verified+, keys, heartbeat |
+| Consent | ✅ Complete | /consent — dual consent, in-game, revocation |
+| Privacy (by Design) | ✅ Complete | /privacy — how privacy is enforced |
+| Legal (Privacy Policy) | ✅ Complete | /privacy-policy — full policy + GDPR/CCPA §14 |
+| Data Rights | ✅ Complete | /data-rights — access, correction, deletion |
+| Contact | ✅ Complete | /contact — placeholder; wire form/email before release |
+| Terms | ✅ Complete | /terms — Terms of Service |
+| About | ✅ Complete | /about — placeholder |
+| FAQ | ✅ Complete | /faq — placeholder |
+
 ### ❌ Missing Pages (Per Design Docs)
 
 | Page | Status | Notes |
 |------|--------|-------|
-| About | ❌ Missing | Not in MVP, but mentioned in dev plan |
 | Pricing | ❌ Missing | Dev plan says "optional, can be stubbed" |
-| FAQ | ❌ Missing | Not in MVP |
-| Terms | ❌ Missing | Not in MVP |
-| Privacy | ❌ Missing | Not in MVP |
-| Player Dashboard | ❌ Missing | Favorites view (not in MVP) |
-| Account Settings | ❌ Missing | User profile/settings page |
+| Player Dashboard (favorites-only) | ❌ Missing | Favorites live on Home/directory; dedicated view optional |
+| Account Settings | ❌ Missing | User profile, email/password change, deletion |
 | Cluster Pages | ❌ Missing | Phase 1.5 feature |
 
 ---
 
 ## Critical Missing Features (MVP Blockers)
 
-### 1. ❌ Server CRUD Backend Implementation
+### 1. ✅ Server CRUD Backend — **IMPLEMENTED**
 
-**Impact**: HIGH - Frontend ready, backend stubbed
-
-**Required:**
-- `POST /api/v1/servers` - Create server
-- `PUT /api/v1/servers/{id}` - Update server
-- `DELETE /api/v1/servers/{id}` - Delete server
-- `GET /api/v1/servers` - List owner's servers (different from directory)
-
-**Current State**: All endpoints return "not yet implemented" errors.
-
-**Priority**: **CRITICAL** - Dashboard is unusable without this.
+**Status**: Complete. `GET/POST/PUT/DELETE /api/v1/servers` implemented; dashboard create/edit/delete works with RLS client.
 
 ---
 
-### 2. ❌ Favorites Backend API
+### 2. ✅ Favorites Backend API — **IMPLEMENTED**
 
-**Impact**: MEDIUM - UI exists, backend missing
-
-**Required:**
-- `POST /api/v1/servers/{id}/favorites` - Add favorite
-- `DELETE /api/v1/servers/{id}/favorites` - Remove favorite
-- `GET /api/v1/servers/{id}/favorites` - Check favorite status (optional)
-
-**Current State**: Frontend has optimistic updates, but no persistence.
-
-**Priority**: **HIGH** - Core MVP feature per feature list.
+**Status**: Complete. `POST/DELETE /api/v1/servers/{id}/favorites` implemented; favorites persist.
 
 ---
 
@@ -335,95 +324,49 @@
 ## Summary by Category
 
 ### ✅ Complete (MVP Requirements)
-- ✅ Directory listing with filters
+- ✅ Directory listing with filters (including map)
 - ✅ Server detail pages
 - ✅ Authentication (email/password)
 - ✅ Badge system (MVP badges)
-- ✅ Newbie carousel
+- ✅ SpotlightCarousel (one carousel, selection locked, documented)
 - ✅ Heartbeat ingestion (backend)
 - ✅ Agent verification (backend)
+- ✅ Server CRUD (backend + dashboard)
+- ✅ Favorites (backend API + UI)
+- ✅ Trust pages (Verification, Consent, Legal, Data Rights, Contact)
+- ✅ Maps normalization + Discord/website URLs
 - ✅ Error handling & loading states
 - ✅ Responsive design
 - ✅ Accessibility
 
-### ⚠️ Partial (Needs Backend)
-- ⚠️ Server CRUD (frontend ready, backend stubbed)
-- ⚠️ Favorites (UI ready, backend missing)
-- ⚠️ Agent token generation (UI placeholder, backend may exist)
+### ✅ Complete (Sprint 7 Additions)
+- ✅ Server CRUD (backend + frontend)
+- ✅ Favorites (backend API + UI)
+- ✅ Trust pages (Verification, Consent, Privacy, Legal, Data Rights, Contact, Terms)
+- ✅ SpotlightCarousel (selection locked, limit 8, wrap-around, documented)
+- ✅ Maps normalization (table, filter, ServerForm dropdown + custom map)
+- ✅ Discord URL + Website URL on servers (backend + ServerForm + ServerCard + ServerPage)
+- ✅ About, FAQ (pages exist; content can be expanded)
 
-### ❌ Missing (MVP Blockers)
-- ❌ Server CRUD backend implementation
-- ❌ Favorites backend API
+### ⚠️ Partial (Deferred to Sprint 8 / Post-Launch)
+- ⚠️ Agent token/key generation (backend ready, UI placeholder)
+- ⚠️ Contact page (exists; wire form/email before release)
+
+### ❌ Missing (MVP Blockers — Agent Track)
 - ❌ Local host agent client
-- ❌ Agent token generation UI
+- ❌ Agent token/key generation UI (blocking agent setup)
 
 ### ❌ Missing (Phase 1.5+)
 - ❌ Cluster pages
 - ❌ Top 100 / Hot carousels
 - ❌ Player directory
 - ❌ Account settings page
-- ❌ About/FAQ/Terms/Privacy pages
 
 ---
 
 ## Recommended Next Steps
 
-### Priority 1: MVP Completion (Critical)
-
-1. **Implement Server CRUD Backend** (2-3 days)
-   - `POST /api/v1/servers` - Create
-   - `PUT /api/v1/servers/{id}` - Update
-   - `DELETE /api/v1/servers/{id}` - Delete
-   - `GET /api/v1/servers` - List owner's servers (different from directory)
-   - Wire to Supabase `servers` table
-   - Add ownership checks (RLS already in place)
-   - Handle `hosting_provider` validation (must be 'self_hosted')
-
-2. **Implement Favorites Backend** (1-2 days)
-   - `POST /api/v1/servers/{id}/favorites` - Add favorite
-   - `DELETE /api/v1/servers/{id}/favorites` - Remove favorite
-   - `GET /api/v1/servers/{id}/favorites` - Check favorite status (optional)
-   - Wire to `favorites` table (exists in schema)
-   - RLS policies already in place
-   - Update `directory_view` favorite counts (already computed)
-
-3. **Agent Token/Key Generation** (2-3 days)
-   - **Backend**: Cluster key pair generation endpoint
-     - `POST /api/v1/clusters/{id}/generate-keys` - Generate Ed25519 key pair
-     - Store `public_key_ed25519` in clusters table
-     - Return private key to owner (one-time display)
-   - **Backend**: Agent instance management
-     - `POST /api/v1/clusters/{id}/instances` - Create agent instance
-     - `GET /api/v1/clusters/{id}/instances` - List instances
-     - Link instances to servers
-   - **Frontend**: Dashboard UI
-     - Token/key generation UI
-     - Key display (one-time)
-     - Instance management
-     - Agent setup instructions
-   - **Note**: Agent authentication uses cluster keys, not tokens. Need to clarify token vs key model.
-
-### Priority 2: Agent Client (High)
-
-4. **Build Local Host Agent** (1-2 weeks)
-   - Node.js/TypeScript agent service
-   - Local web UI
-   - Process/port checks
-   - Heartbeat sending
-   - Windows packaging
-
-### Priority 3: Polish (Medium)
-
-5. **Additional Pages** (1-2 days)
-   - About page
-   - FAQ page
-   - Terms/Privacy (can be stubbed)
-
-6. **Account Settings** (2-3 days)
-   - User profile page
-   - Email change
-   - Password change
-   - Account deletion
+**All actionable development tasks are tracked in [SPRINT_8_TODO.md](SPRINT_8_TODO.md).** That doc is the single backlog for: agent key/instance management, local host agent client, account settings, contact/email wiring, server images, ranking, per-user limits, and Phase 1.5 work. This section is retained for historical context only.
 
 ---
 
@@ -436,7 +379,7 @@
 - ✅ `heartbeat_jobs` - Async processing queue (durable worker queue)
 - ✅ `server_secrets` - Owner-only secrets (join_password moved here for security)
 - ✅ `directory_view` - Public read model (denormalized for performance)
-- ✅ `favorites` - User favorites (table exists, API missing)
+- ✅ `favorites` - User favorites (table + API implemented)
 - ✅ `profiles` - User profiles (extends auth.users)
 - ✅ `subscriptions` - Stripe subscriptions (table exists, endpoints stubbed)
 
@@ -470,25 +413,60 @@
 
 ---
 
-## Conclusion
+## MVP Complete Analysis (vs Design Docs)
 
-**MVP Status**: ~75% complete
+Comparison against **docs/design/1_DESCRIPTION.txt**, **docs/design/2_FEATURE_LIST.txt**, **docs/design/4_Dev_Plan.txt**, and **docs/design/3_TECH_STACK.txt**.
 
-**Strengths:**
-- ✅ Frontend is production-ready
-- ✅ Core directory functionality complete
-- ✅ Heartbeat/verification backend complete
-- ✅ Security boundaries in place
-- ✅ Excellent test coverage
+### 1_DESCRIPTION (docs/design) — Platform Vision
+- **Registry, discovery, visibility, trust**: ✅ Directory, server pages, verification (backend), trust pages.
+- **Free public directory, optional automation**: ✅ Manual listing + heartbeat/verified status.
+- **Supabase-first, FastAPI for agent**: ✅ Implemented.
+- **Agent for verified status**: Backend ready; agent client not built (deferred).
 
-**Critical Gaps:**
-- ❌ Server CRUD backend (blocking dashboard) - **HIGHEST PRIORITY**
-- ❌ Favorites backend API (blocking favorites feature) - **HIGH PRIORITY**
-- ❌ Agent key/instance management (blocking agent setup) - **MEDIUM PRIORITY**
-- ❌ Agent client (blocking verification workflow) - **HIGH PRIORITY** (but can be parallel)
+### 2_FEATURE_LIST — 90% MVP Scope Lock
+- **Core Directory (Always Free)**: ✅ Listings, status, mod/rates/wipe/cluster, server page, join instructions, **account-gated password** (visible when authenticated), search & filters, favorites, player accounts.
+- **Badge System**: ✅ Verified, Stable, New, PvE/PvP, Vanilla/Boosted. Hot, Long-Runner, cluster/player badges = Phase 1.5+.
+- **One carousel (Newbie)**: ✅ Delivered as SpotlightCarousel (verified + boosted, quality, limit 8); documented.
+- **Subscription plumbing**: Stubbed (acceptable for MVP per dev plan).
+- **Plugin (Secure key, verification, heartbeat)**: ✅ Backend complete; agent client not built.
 
-**Recommendation**: Focus on Priority 1 items to complete MVP. Agent client can be built in parallel or after MVP launch.
+### 4_Dev_Plan (docs/design) — Web + Agent MVP
+- **Sprint 0–1 (Foundation, Free Directory)**: ✅ Schema, RLS, directory_view, auth, directory, server CRUD, favorites, **account-gated** password (dev plan said “favorite → reveal”; implemented as account-gated for security).
+- **Sprint 2 (Agent Verified)**: Backend ✅; agent client ❌.
+- **Sprint 3 (Badges + Carousel + Polish)**: ✅ Badges, SpotlightCarousel, owner diagnostics (heartbeat) stubbed.
+- **Stabilization (Trust pages, docs)**: ✅ Verification, Consent, Privacy, Legal, Data Rights, Contact, Terms; linked from footer.
+
+### 3_TECH_STACK (docs/design)
+- **Frontend**: React, TypeScript, Vite, Tailwind, Radix/shadcn, TanStack Query, RHF + Zod, React Router — ✅.
+- **Backend**: Python/Pydantic, Supabase, FastAPI — ✅.
+- **Auth**: Supabase Auth (email), RLS — ✅. “Password gating” implemented as **account-gated** (authenticated users only).
+
+### MVP Verdict
+- **Web MVP**: Complete for launch (directory, CRUD, favorites, trust pages, SpotlightCarousel, maps, Discord/website URLs). Contact page placeholder; wire form/email before release.
+- **Agent MVP**: Backend complete; agent client and key/instance UI deferred to Sprint 8 / post-launch. Platform is **soft-launch ready** without agent; agent adds verified status when built.
 
 ---
 
-**Last Updated**: 2026-01-26
+## Conclusion
+
+**MVP Status**: ~90% complete (web MVP complete; agent client deferred)
+
+**Strengths:**
+- ✅ Frontend production-ready; trust pages and legal coverage in place
+- ✅ Core directory, Server CRUD, Favorites, maps, Discord/website URLs complete
+- ✅ Heartbeat/verification backend complete
+- ✅ Security boundaries and account-gated password
+- ✅ Excellent test coverage
+
+**Critical Gaps (Sprint 8 / Post-Launch):**
+- ✅ Server CRUD backend — **IMPLEMENTED**
+- ✅ Favorites backend API — **IMPLEMENTED**
+- ❌ Agent key/instance management (blocking agent setup) — **MEDIUM** (see SPRINT_8_TODO.md)
+- ❌ Agent client — **HIGH** (backend ready; can ship without)
+- ⚠️ Contact page — wire form/email before release (see FinalCheck.md)
+
+**Recommendation**: Web MVP and Sprint 7 definition of done are met. Use **SPRINT_8_TODO.md** for remaining items (agent, contact, optional polish). Run **FinalCheck.md** before deploy.
+
+---
+
+**Last Updated**: 2026-02-02

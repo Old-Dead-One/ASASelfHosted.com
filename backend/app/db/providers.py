@@ -10,6 +10,7 @@ from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.db.directory_repo import DirectoryRepository
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
+from app.db.maps_repo import MapsRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
 from app.db.mods_catalog_repo import ModsCatalogRepository
@@ -19,6 +20,7 @@ from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRep
 from app.db.supabase_directory_repo import SupabaseDirectoryRepository
 from app.db.supabase_heartbeat_jobs_repo import SupabaseHeartbeatJobsRepository
 from app.db.supabase_heartbeat_repo import SupabaseHeartbeatRepository
+from app.db.supabase_maps_repo import SupabaseMapsRepository
 from app.db.supabase_mods_catalog_repo import SupabaseModsCatalogRepository
 from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepository
 from app.db.supabase_servers_repo import SupabaseServersRepository
@@ -207,6 +209,23 @@ def get_servers_repo(user_jwt: str) -> ServersRepository:
         SupabaseServersRepository with RLS client configured
     """
     return SupabaseServersRepository(user_jwt)
+
+
+# Maps repository instance (stateless, safe to share)
+_maps_repo: MapsRepository | None = None
+
+
+def get_maps_repo() -> MapsRepository:
+    """
+    Maps repository provider.
+
+    Returns SupabaseMapsRepository (uses anon key; maps table has public read).
+    If Supabase anon is not configured, list_all returns empty.
+    """
+    global _maps_repo
+    if _maps_repo is None:
+        _maps_repo = SupabaseMapsRepository()
+    return _maps_repo
 
 
 # Mods catalog repository instance (stateless, safe to share)

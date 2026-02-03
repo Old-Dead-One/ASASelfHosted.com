@@ -26,7 +26,6 @@ export function ServerList({ filters, paged = true }: ServerListProps) {
         refetch,
         hasNextPage,
         hasPreviousPage,
-        nextPage,
         prevPage,
         fetchNextPage,
         isFetching,
