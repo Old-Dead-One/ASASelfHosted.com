@@ -40,6 +40,7 @@ Single entry point for ASA Self-Hosted documentation. Use this to find the right
 | **docs/TRUST_PAGES.md** | Trust pages (/verification, /consent) content and acceptance criteria. |
 | **docs/SERVER_IMAGES.md** | Server images feature spec (banner upload, moderation). |
 | **docs/REFERENCE_SCHEMA_SPRINT0_TO_5.md** | Schema reference. |
+| **docs/MVP_VS_DESIGN_SUMMARY.md** | One-page status vs original design docs; complete vs beyond MVP. |
 | **docs/Trust_Claims_Audit.md** | Trust claims vs enforcement (for audits). |
 | **docs/STEAM_OAUTH_TODO.md** | Steam OAuth implementation notes (when needed). |
 
