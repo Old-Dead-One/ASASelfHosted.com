@@ -3,6 +3,8 @@
 **WARNING: This schema is for reference only and is not meant to be executed.**
 **It represents the cumulative state after all migrations 001-010 have been applied.**
 
+**Current schema:** For up-to-date schema and migrations, see **backend/app/db/migrations/** and **backend/app/db/migrations/README.md**. This doc is a historical reference (Sprint 0–5 baseline).
+
 This document provides a single source of truth for the database schema after Sprint 5 completion.
 
 ## Table of Contents

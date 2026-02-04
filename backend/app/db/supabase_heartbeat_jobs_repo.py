@@ -269,19 +269,28 @@ class SupabaseHeartbeatJobsRepository(HeartbeatJobsRepository):
             ) from e
 
     async def mark_failed(self, job_id: str, error: str, attempts: int) -> None:
-        """Mark a job as failed (keep pending for retry)."""
+        """
+        Mark a job as failed.
+
+        If attempts >= HEARTBEAT_JOB_MAX_ATTEMPTS, mark as permanently failed
+        (set processed_at and last_error) so it is not re-claimed (dead-letter).
+        Otherwise clear claimed_at and set last_error for retry.
+        """
         if not self._configured or self._supabase is None:
             raise RuntimeError("SupabaseHeartbeatJobsRepository not configured")
 
+        max_attempts = get_settings().HEARTBEAT_JOB_MAX_ATTEMPTS
+        permanently_failed = attempts >= max_attempts
+
         try:
-            self._supabase.table("heartbeat_jobs").update(
-                {
-                    "last_error": error,
-                    "attempts": attempts,
-                    "claimed_at": None,  # allow retry
-                    # Keep processed_at = NULL so job remains pending for retry
-                }
-            ).eq("id", job_id).execute()
+            payload = {
+                "last_error": error,
+                "attempts": attempts,
+                "claimed_at": None,
+            }
+            if permanently_failed:
+                payload["processed_at"] = datetime.now(timezone.utc).isoformat()
+            self._supabase.table("heartbeat_jobs").update(payload).eq("id", job_id).execute()
         except Exception as e:
             error_str = str(e)
             if "heartbeat_jobs" in error_str.lower() and (

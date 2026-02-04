@@ -92,8 +92,8 @@ Always remind to commit after significant work to prevent data loss.
 - **`docs/WORKING_DOCS.md`** — Index of all working docs (start here)
 - `DECISIONS.md` — Official decisions (override any doc mismatches)
 - `docs/design/PROJECT_STRUCTURE.md` — File and folder structure
-- `SPRINT_8_TODO.md` — Single backlog (all open items)
-- `FinalCheck.md` — Pre-launch checklist
+- `docs/TODO.md` — Single backlog (all open items)
+- `docs/FinalCheck.md` — Pre-launch checklist
 - `INSTALL.md` — Installation
 - `README.md` — Project overview
 - `docs/design/1_DESCRIPTION.txt` — Project description
@@ -110,4 +110,4 @@ Always remind to commit after significant work to prevent data loss.
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*

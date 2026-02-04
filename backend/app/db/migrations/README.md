@@ -221,6 +221,7 @@ Adds agent authentication infrastructure:
 - Replay protection via unique constraint
 - Durable worker queue (table-based, not BackgroundTasks)
 - Grace window: env default + per-cluster override
+- **Retry and dead-letter (Sprint 8):** Job processing is idempotent. Failed jobs are retried until `attempts >= HEARTBEAT_JOB_MAX_ATTEMPTS` (config); then job is marked permanently failed (`processed_at` set) and not re-claimed. See [OPERATIONS.md](../../../../docs/OPERATIONS.md) §4 Background Jobs.
 
 **To Run:**
 1. Ensure `001_sprint_0_schema.sql` and `003_sprint_3_directory_view.sql` have been applied first
@@ -231,6 +232,18 @@ Adds agent authentication infrastructure:
    - New columns exist in `clusters`, `heartbeats`, `servers` tables
    - `heartbeat_jobs` table created
    - Indexes and constraints created
+
+### `028_performance_advisor_fixes.sql`
+**Performance Advisor fixes (scale-ready)**
+
+Addresses Supabase Performance Advisor warnings for hundreds/thousands of servers and users:
+
+1. **Auth RLS initplan:** All RLS policies that use `auth.uid()` now use `(select auth.uid())` so Postgres evaluates once per query instead of per row (profiles, clusters, servers, heartbeats, favorites, subscriptions, server_secrets, heartbeat_jobs).
+2. **Multiple permissive policies:** Merged two SELECT policies on `clusters` into one ("Clusters readable: public or owner") and two on `heartbeats` into one ("Heartbeats readable: recent public or owner").
+3. **Duplicate indexes:** Dropped redundant indexes: `idx_favorites_server` (keep `idx_favorites_server_id`), constraint `uq_favorites_user_server` (keep `favorites_user_id_server_id_key`), `idx_servers_cluster` (keep `idx_servers_cluster_id`).
+4. **Unindexed FK:** Added `idx_incident_notes_cluster_id` on `incident_notes(cluster_id)`.
+
+**To Run:** Copy contents into Supabase SQL Editor and execute (after `027_ingest_rejections_server_id_nullable.sql`). Re-check Performance Advisor to confirm warnings are resolved.
 
 ## Next Steps
 

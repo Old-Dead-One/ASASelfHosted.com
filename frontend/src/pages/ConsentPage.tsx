@@ -3,14 +3,31 @@
  *
  * Explains that data collection requires explicit, in-game consent.
  * Content must match platform and plugin behavior; no future promises.
+ * Sprint 8: consent state indicator and assurance copy.
  */
 
+import { useConsentState } from '@/hooks/useConsentState'
+import { useAuth } from '@/contexts/AuthContext'
+
 export function ConsentPage() {
+    const { isAuthenticated } = useAuth()
+    const { data: consentState } = useConsentState()
+
     return (
         <div className="py-8 px-4 max-w-3xl mx-auto">
             <h1 className="text-3xl font-bold text-foreground mb-6">
                 Consent Explained
             </h1>
+
+            <p className="text-muted-foreground mb-6 font-medium">
+                Nothing is collected until you complete consent in-game. The platform cannot enable permissions remotely or collect data by default.
+            </p>
+
+            {isAuthenticated && consentState && (
+                <p className="text-sm text-muted-foreground mb-6" title="Inactive = no data collected; Partial = server eligible, player consent pending; Active = both agreed.">
+                    Your consent state: <span className="font-medium capitalize">{consentState.consent_state}</span>
+                </p>
+            )}
 
             <section className="mb-8 p-4 rounded-lg border-2 border-primary/30 bg-primary/5">
                 <h2 className="text-xl font-semibold text-foreground mb-3">

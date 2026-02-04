@@ -33,6 +33,7 @@ function buildParams(filters?: ServerFilters, cursor?: string | null): URLSearch
     if (filters?.game_mode) params.set('game_mode', filters.game_mode)
     if (filters?.ruleset) params.set('ruleset', filters.ruleset)
     if (filters?.is_cluster) params.set('is_cluster', filters.is_cluster)
+    if (filters?.cluster?.trim()) params.set('cluster', filters.cluster.trim())
     if (filters?.platform) {
         if (filters.platform === 'pc') {
             params.set('pc', 'true')
@@ -53,6 +54,9 @@ function buildParams(filters?: ServerFilters, cursor?: string | null): URLSearch
 
 export function useServers(filters?: ServerFilters, options?: UseServersOptions) {
     const paged = options?.paged ?? true
+    // Use a stable key so object-literal filters don't cause reset loops.
+    // (e.g. { cluster: slug, limit: 50, view } created inline each render)
+    const filtersKey = JSON.stringify(filters ?? {})
 
     const [currentCursor, setCurrentCursor] = useState<string | null>(null)
     const [cursorStack, setCursorStack] = useState<(string | null)[]>([])
@@ -62,10 +66,10 @@ export function useServers(filters?: ServerFilters, options?: UseServersOptions)
         setCurrentCursor(null)
         setCursorStack([])
         totalFromFirstPage.current = undefined
-    }, [filters])
+    }, [filtersKey])
 
     const singlePageQuery = useQuery({
-        queryKey: ['servers', filters, currentCursor],
+        queryKey: ['servers', filtersKey, currentCursor],
         queryFn: async () => {
             const params = buildParams(filters, currentCursor)
             const url = `/api/v1/directory/servers?${params.toString()}`
@@ -92,7 +96,7 @@ export function useServers(filters?: ServerFilters, options?: UseServersOptions)
     }, [cursorStack])
 
     const infiniteQuery = useInfiniteQuery({
-        queryKey: ['servers', filters],
+        queryKey: ['servers', filtersKey],
         queryFn: async ({ pageParam }) => {
             const params = buildParams(filters, pageParam ?? undefined)
             const url = `/api/v1/directory/servers?${params.toString()}`

@@ -52,3 +52,33 @@ class KeyPairResponse(BaseSchema):
         "⚠️ IMPORTANT: Save this private key now. "
         "It will not be shown again. You'll need it to configure your agent."
     )
+
+
+class AgentConfigResponse(BaseSchema):
+    """Agent config for a cluster (owner-only). Used by local agent to know key_version and grace."""
+
+    cluster_id: str
+    key_version: int
+    heartbeat_grace_seconds: int | None = None
+    min_agent_version: str | None = None  # From app config; agent should upgrade if below
+
+
+class ClusterServerItem(BaseSchema):
+    """Minimal server info for agent import (list servers in cluster)."""
+
+    id: str  # server_id
+    name: str
+    map_name: str | None = None
+
+
+class AssignAllServersResponse(BaseSchema):
+    """Result of assigning the owner's servers to a cluster."""
+
+    cluster_id: str
+    dry_run: bool = False
+    only_unclustered: bool = False
+    total_owner_servers: int
+    already_in_cluster: int
+    unclustered: int
+    in_other_cluster: int
+    would_change: int

@@ -247,7 +247,7 @@ export function PrivacyPolicyPage() {
                     13. How to Contact
                 </h2>
                 <p className="text-muted-foreground">
-                    For questions about this policy, data rights requests (access, correction, deletion), or other inquiries, use the <Link to="/contact" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">Contact</Link> page. For a dedicated flow to submit a data rights request, see the <Link to="/data-rights" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">Data Rights Request</Link> page. We may need to verify your identity before fulfilling a data-rights request.
+                    For questions about this policy, data rights requests (access, correction, deletion), or other inquiries, use the <Link to="/contact" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">Contact</Link> page. For a dedicated flow to submit a data rights request, see the <Link to="/data-rights" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">Data Rights Request</Link> page. We may need to verify your identity before fulfilling a data-rights request. Account and data deletion are fulfilled <strong>by request</strong>; we do not offer an automated self-service deletion flow at this time.
                 </p>
             </section>
 

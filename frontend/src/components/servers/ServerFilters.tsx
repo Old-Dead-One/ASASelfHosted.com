@@ -27,6 +27,8 @@ export interface ServerFilters {
     view?: DirectoryView
     /** Filter by cluster association (any/true/false). true = has cluster, false = no cluster */
     is_cluster?: TriState
+    /** Filter by cluster slug (for cluster detail page). */
+    cluster?: string
     /** Filter by platform: PC Only, Console Only, or Crossplay */
     platform?: PlatformFilter
     /** Filter by map name (single select from known maps). */

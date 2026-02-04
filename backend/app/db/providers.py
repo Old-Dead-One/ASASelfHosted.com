@@ -10,6 +10,7 @@ from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.db.directory_repo import DirectoryRepository
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
+from app.db.ingest_rejections_repo import IngestRejectionsRepository
 from app.db.maps_repo import MapsRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
@@ -20,6 +21,7 @@ from app.db.supabase_directory_clusters_repo import SupabaseDirectoryClustersRep
 from app.db.supabase_directory_repo import SupabaseDirectoryRepository
 from app.db.supabase_heartbeat_jobs_repo import SupabaseHeartbeatJobsRepository
 from app.db.supabase_heartbeat_repo import SupabaseHeartbeatRepository
+from app.db.supabase_ingest_rejections_repo import SupabaseIngestRejectionsRepository
 from app.db.supabase_maps_repo import SupabaseMapsRepository
 from app.db.supabase_mods_catalog_repo import SupabaseModsCatalogRepository
 from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepository
@@ -95,10 +97,11 @@ def get_directory_repo() -> DirectoryRepository:
         )
 
 
-# Heartbeat repository instances (stateless, safe to share)
+# Heartbeat and ingest rejections repository instances (stateless, safe to share)
 _heartbeat_repo: HeartbeatRepository | None = None
 _heartbeat_jobs_repo: HeartbeatJobsRepository | None = None
 _servers_derived_repo: ServersDerivedRepository | None = None
+_ingest_rejections_repo: IngestRejectionsRepository | None = None
 
 
 def get_heartbeat_repo() -> HeartbeatRepository:
@@ -135,6 +138,18 @@ def get_servers_derived_repo() -> ServersDerivedRepository:
     if _servers_derived_repo is None:
         _servers_derived_repo = SupabaseServersDerivedRepository()
     return _servers_derived_repo
+
+
+def get_ingest_rejections_repo() -> IngestRejectionsRepository:
+    """
+    Ingest rejections repository provider.
+
+    Returns SupabaseIngestRejectionsRepository (requires service_role key).
+    """
+    global _ingest_rejections_repo
+    if _ingest_rejections_repo is None:
+        _ingest_rejections_repo = SupabaseIngestRejectionsRepository()
+    return _ingest_rejections_repo
 
 
 def get_directory_clusters_repo() -> DirectoryClustersRepository:

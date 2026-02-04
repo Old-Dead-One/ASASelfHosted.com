@@ -138,6 +138,27 @@ class ServerUpdateRequest(BaseSchema):
         return self
 
 
+class ServerAgentKeyStatusResponse(BaseSchema):
+    """Owner-only agent key status for a server."""
+
+    server_id: str
+    key_version: int
+    has_key: bool  # True when public_key_ed25519 is set
+
+
+class ServerKeyPairResponse(BaseSchema):
+    """Response for server key pair generation (one-time private key display)."""
+
+    server_id: str
+    key_version: int
+    public_key: str  # Base64-encoded Ed25519 public key
+    private_key: str  # Base64-encoded Ed25519 private key (one-time display)
+    warning: str = (
+        "⚠️ IMPORTANT: Save this private key now. "
+        "It will not be shown again. You'll need it to configure your agent."
+    )
+
+
 class MyServersResponse(BaseSchema):
     """
     Response for listing owner's servers.

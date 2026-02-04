@@ -119,6 +119,7 @@ class FakeDerivedRepoForWorker(ServersDerivedRepository):
         server_id: str,
         received_at: datetime,
         heartbeat_timestamp: datetime,
+        status: str,
         players_current: int | None,
         players_capacity: int | None,
     ) -> None:

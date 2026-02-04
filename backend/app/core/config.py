@@ -8,6 +8,7 @@ No secrets in code, ever.
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,6 +57,9 @@ class Settings(BaseSettings):
     # Auth bypass (local development only - explicit opt-in)
     AUTH_BYPASS_LOCAL: bool = False
 
+    # Admin: comma-separated list of user UUIDs allowed to access admin endpoints
+    ADMIN_USER_IDS: str = ""
+
     # Directory view name (configurable for future migrations)
     DIRECTORY_VIEW_NAME: str = "directory_view"
 
@@ -74,13 +78,22 @@ class Settings(BaseSettings):
     HEARTBEAT_GRACE_MIN: int = 60  # 1 minute minimum
     HEARTBEAT_GRACE_MAX: int = 3600  # 1 hour maximum
 
+    # Agent/plugin version enforcement (optional)
+    # If set, heartbeats with agent_version below this are rejected (202 + message).
+    MIN_AGENT_VERSION: str | None = None  # e.g. "0.1.0"
+
     # Worker configuration
     HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: int = 5  # Poll interval for worker
     HEARTBEAT_JOB_BATCH_SIZE: int = 50  # Batch size for job processing
     HEARTBEAT_JOB_CLAIM_TTL_SECONDS: int = 120  # reclaim jobs if worker dies mid-claim
+    HEARTBEAT_JOB_MAX_ATTEMPTS: int = 5  # After this many failures, job is permanently failed (dead-letter)
     HEARTBEAT_HISTORY_LIMIT: int = 500  # Max heartbeats to fetch per server
     HEARTBEAT_UPTIME_WINDOW_HOURS: int = 24  # Uptime calculation window
     RUN_HEARTBEAT_WORKER: bool = True
+
+    # Per-user abuse limits (env-configurable)
+    MAX_SERVERS_PER_USER: int = 14  # Hard limit; 14 = all official + DLC maps; 0 < value <= 100
+    MAX_CLUSTERS_PER_USER: int = 1  # Default 1 cluster per account; admin can override per user
 
     # Anomaly detection
     ANOMALY_DECAY_MINUTES: int = 30  # Clear anomaly flag after T minutes without spikes
@@ -118,6 +131,19 @@ class Settings(BaseSettings):
 
         if not self.SUPABASE_JWKS_URL:
             raise ValueError("SUPABASE_JWKS_URL must be set in staging/production")
+
+    @model_validator(mode="after")
+    def validate_limits(self) -> "Settings":
+        """Ensure per-user limits are in valid range."""
+        if self.MAX_SERVERS_PER_USER <= 0 or self.MAX_SERVERS_PER_USER > 100:
+            raise ValueError(
+                "MAX_SERVERS_PER_USER must be greater than 0 and at most 100"
+            )
+        if self.MAX_CLUSTERS_PER_USER <= 0 or self.MAX_CLUSTERS_PER_USER > 50:
+            raise ValueError(
+                "MAX_CLUSTERS_PER_USER must be greater than 0 and at most 50"
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

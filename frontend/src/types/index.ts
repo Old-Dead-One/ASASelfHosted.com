@@ -162,5 +162,24 @@ export interface Cluster {
     slug: string
     visibility: 'public' | 'unlisted'
     owner_user_id: string
-    // TODO: Add remaining cluster fields when cluster pages are implemented
+}
+
+// Public directory cluster (GET /api/v1/directory/clusters)
+export interface DirectoryCluster {
+    id: string
+    name: string
+    slug: string
+    visibility: ClusterVisibility
+    created_at: string
+    updated_at: string
+    server_count: number
+}
+
+export interface DirectoryClustersResponse {
+    data: DirectoryCluster[]
+    limit: number
+    cursor: string | null
+    next_cursor: string | null
+    sort_by?: string
+    order?: string
 }

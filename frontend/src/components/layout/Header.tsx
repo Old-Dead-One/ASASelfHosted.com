@@ -36,18 +36,18 @@ export function Header() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Link
-                            to="/about"
+                            to="/servers"
                             className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
-                            aria-label="About"
+                            aria-label="Servers"
                         >
-                            About
+                            Servers
                         </Link>
                         <Link
-                            to="/faq"
+                            to="/clusters"
                             className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
-                            aria-label="FAQ"
+                            aria-label="Clusters"
                         >
-                            FAQ
+                            Clusters
                         </Link>
                         {isAuthenticated ? (
                             <>
@@ -58,6 +58,20 @@ export function Header() {
                                 >
                                     <span className="hidden sm:inline">Dashboard</span>
                                     <span className="sm:hidden">Dash</span>
+                                </Link>
+                                <Link
+                                    to="/about"
+                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
+                                    aria-label="About"
+                                >
+                                    About
+                                </Link>
+                                <Link
+                                    to="/faq"
+                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
+                                    aria-label="FAQ"
+                                >
+                                    FAQ
                                 </Link>
                                 <span className="text-xs text-muted-foreground hidden md:inline truncate max-w-[220px]" title={user?.email ?? undefined}>
                                     {user?.email}
@@ -76,6 +90,20 @@ export function Header() {
                             </>
                         ) : (
                             <>
+                                <Link
+                                    to="/about"
+                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
+                                    aria-label="About"
+                                >
+                                    About
+                                </Link>
+                                <Link
+                                    to="/faq"
+                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"
+                                    aria-label="FAQ"
+                                >
+                                    FAQ
+                                </Link>
                                 <Link
                                     to="/login"
                                     className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md px-2 py-1 flex items-center leading-tight"

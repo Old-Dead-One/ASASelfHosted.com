@@ -4,7 +4,7 @@
  * Single-row horizontal carousel of 8 featured servers with arrow navigation and auto-scroll.
  * Content is duplicated so the carousel wraps around infinitely (scroll right flows to start).
  * Selection criteria (locked): verified, boosted, ranked by quality desc.
- * Criteria: mode=verified, ruleset=boosted, rank_by=quality, order=desc, limit=8 (see SPRINT_8_TODO).
+ * Criteria: mode=verified, ruleset=boosted, rank_by=quality, order=desc, limit=8 (see docs/TODO.md).
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react'

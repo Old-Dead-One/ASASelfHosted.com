@@ -10,8 +10,14 @@
  * Override with VITE_API_BASE_URL in other environments.
  */
 
-const API_BASE_URL =
+import type { DirectoryCluster, DirectoryClustersResponse } from '@/types'
+
+/** Base URL for API (and heartbeat). Export for dashboard agent-config copy. */
+export const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || 'http://localhost:5173'
+
+/** Heartbeat endpoint path (POST). Full URL = API_BASE_URL + HEARTBEAT_PATH */
+export const HEARTBEAT_PATH = '/api/v1/heartbeat'
 
 /**
  * Temporary session cache for immediate use after sign-in.
@@ -297,6 +303,94 @@ export async function acceptTerms(acceptanceType: 'account' | 'server_listing'):
 }
 
 // =============================================================================
+// Consent state (Sprint 8 – trust UX)
+// =============================================================================
+
+export type ConsentState = 'inactive' | 'partial' | 'active'
+
+export interface ConsentStateResponse {
+    consent_state: ConsentState
+}
+
+export async function getConsentState(): Promise<ConsentStateResponse> {
+    return apiRequest<ConsentStateResponse>('/api/v1/me/consent-state')
+}
+
+// =============================================================================
+// Per-user limits (Sprint 9 – dashboard “X of Y servers”)
+// =============================================================================
+
+export interface LimitsResponse {
+    servers_used: number
+    servers_limit: number
+    clusters_used: number
+    clusters_limit: number
+}
+
+export async function getLimits(): Promise<LimitsResponse> {
+    return apiRequest<LimitsResponse>('/api/v1/me/limits')
+}
+
+/** Timeout for account deletion (ms); backend uses 25s, we allow a bit more. */
+const ACCOUNT_DELETE_TIMEOUT_MS = 32_000
+
+export interface DeleteAccountResponse {
+    ok: boolean
+    message?: string
+}
+
+/**
+ * Permanently delete the current user's account and all data.
+ * Uses a request timeout so the UI does not hang if Supabase is slow.
+ */
+export async function deleteMyAccount(): Promise<DeleteAccountResponse> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), ACCOUNT_DELETE_TIMEOUT_MS)
+    try {
+        const token = await getAuthToken()
+        const url = `${API_BASE_URL}/api/v1/me`
+        const headers: Record<string, string> = {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        }
+        if (import.meta.env.DEV && getDevUserId()) {
+            headers['X-Dev-User'] = getDevUserId()!
+        }
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers,
+            signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+        const text = await response.text()
+        const data = safeParseJSON(text)
+        if (response.status === 504 || (data?.error?.message && data.error.message.includes('longer than usual'))) {
+            throw new APIErrorResponse({
+                code: 'TIMEOUT',
+                message: 'Deletion is taking longer than usual. Please try again in a few minutes or contact support.',
+            })
+        }
+        if (!response.ok) {
+            if (data?.error) throw new APIErrorResponse(data.error)
+            throw new APIErrorResponse({
+                code: 'HTTP_ERROR',
+                message: `HTTP ${response.status}: ${response.statusText}`,
+            })
+        }
+        return (data ?? { ok: true }) as DeleteAccountResponse
+    } catch (err) {
+        clearTimeout(timeoutId)
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new APIErrorResponse({
+                code: 'TIMEOUT',
+                message: 'Deletion is taking longer than usual. Please try again in a few minutes or contact support.',
+            })
+        }
+        throw err
+    }
+}
+
+// =============================================================================
 // Favorites API
 // All require authentication. Use apiRequest which sends Bearer token.
 // =============================================================================
@@ -311,6 +405,19 @@ export async function removeFavorite(serverId: string): Promise<{ success: boole
     return apiRequest<{ success: boolean }>(`/api/v1/servers/${serverId}/favorites`, {
         method: 'DELETE',
     })
+}
+
+export interface FavoriteServerItem {
+    id: string
+    name: string
+}
+
+export interface FavoritesListResponse {
+    data: FavoriteServerItem[]
+}
+
+export async function getMyFavorites(): Promise<FavoritesListResponse> {
+    return apiRequest<FavoritesListResponse>('/api/v1/me/favorites')
 }
 
 // =============================================================================
@@ -339,6 +446,17 @@ export interface KeyPairResponse {
     public_key: string
     private_key: string
     warning: string
+}
+
+export interface AssignAllServersResponse {
+    cluster_id: string
+    dry_run: boolean
+    only_unclustered: boolean
+    total_owner_servers: number
+    already_in_cluster: number
+    unclustered: number
+    in_other_cluster: number
+    would_change: number
 }
 
 export async function listMyClusters(): Promise<Cluster[]> {
@@ -378,6 +496,54 @@ export async function generateClusterKeys(clusterId: string): Promise<KeyPairRes
     return apiRequest<KeyPairResponse>(`/api/v1/clusters/${clusterId}/generate-keys`, {
         method: 'POST',
     })
+}
+
+export async function deleteCluster(clusterId: string): Promise<void> {
+    await apiRequest<void>(`/api/v1/clusters/${clusterId}`, {
+        method: 'DELETE',
+    })
+}
+
+export async function assignAllServersToCluster(
+    clusterId: string,
+    params: { dry_run?: boolean; only_unclustered?: boolean } = {}
+): Promise<AssignAllServersResponse> {
+    const search = new URLSearchParams()
+    if (params.dry_run) search.set('dry_run', 'true')
+    if (params.only_unclustered) search.set('only_unclustered', 'true')
+    const q = search.toString()
+    return apiRequest<AssignAllServersResponse>(`/api/v1/clusters/${clusterId}/assign-all-servers${q ? `?${q}` : ''}`, {
+        method: 'POST',
+    })
+}
+
+// =============================================================================
+// Directory Clusters (public, no auth required)
+// =============================================================================
+
+export async function listDirectoryClusters(params: {
+    limit?: number
+    cursor?: string | null
+    visibility?: 'public' | 'unlisted'
+    sort_by?: string
+    order?: 'asc' | 'desc'
+} = {}): Promise<DirectoryClustersResponse> {
+    const search = new URLSearchParams()
+    if (params.limit != null) search.set('limit', String(params.limit))
+    if (params.cursor) search.set('cursor', params.cursor)
+    if (params.visibility) search.set('visibility', params.visibility)
+    if (params.sort_by) search.set('sort_by', params.sort_by)
+    if (params.order) search.set('order', params.order)
+    const q = search.toString()
+    return apiRequest<DirectoryClustersResponse>(`/api/v1/directory/clusters${q ? `?${q}` : ''}`)
+}
+
+export async function getDirectoryClusterBySlug(slug: string): Promise<DirectoryCluster> {
+    return apiRequest<DirectoryCluster>(`/api/v1/directory/clusters/slug/${encodeURIComponent(slug)}`)
+}
+
+export async function getDirectoryClusterById(clusterId: string): Promise<DirectoryCluster> {
+    return apiRequest<DirectoryCluster>(`/api/v1/directory/clusters/${clusterId}`)
 }
 
 // =============================================================================
@@ -428,6 +594,32 @@ export async function updateServer(
 export async function deleteServer(serverId: string): Promise<{ success: boolean }> {
     return apiRequest<{ success: boolean }>(`/api/v1/servers/${serverId}`, {
         method: 'DELETE',
+    })
+}
+
+/** Agent key status for a server (owner-only). */
+export interface ServerAgentKeyStatusResponse {
+    server_id: string
+    key_version: number
+    has_key: boolean
+}
+
+/** Key pair returned once after generating server keys (owner-only). */
+export interface ServerKeyPairResponse {
+    server_id: string
+    key_version: number
+    public_key: string
+    private_key: string
+    warning?: string
+}
+
+export async function getServerAgentKeyStatus(serverId: string): Promise<ServerAgentKeyStatusResponse> {
+    return apiRequest<ServerAgentKeyStatusResponse>(`/api/v1/servers/${serverId}/agent-key-status`)
+}
+
+export async function generateServerKeys(serverId: string): Promise<ServerKeyPairResponse> {
+    return apiRequest<ServerKeyPairResponse>(`/api/v1/servers/${serverId}/generate-keys`, {
+        method: 'POST',
     })
 }
 

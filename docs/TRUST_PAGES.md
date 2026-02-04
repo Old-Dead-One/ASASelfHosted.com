@@ -91,4 +91,20 @@ Trust pages are **done** when:
 
 ---
 
-**Audit:** Use docs/Trust_Claims_Audit.md to verify claims against code.
+## Audit: Claims vs enforcement
+
+Use this table to verify trust-page claims against code.
+
+| Public Claim | Enforcement Mechanism |
+|-------------|------------------------|
+| Verification confirms identity, not quality | Signed heartbeats + public key verification |
+| Verification cannot be faked remotely | Ed25519 signatures; private key never leaves owner |
+| Old heartbeats cannot be reused | Replay protection on heartbeat endpoint |
+| Verification does not grant placement | Directory ranking logic ignores payment state |
+| Player data is not collected by default | Consent defaults OFF; no implicit collection |
+| Both server owner and player must consent | Dual-consent enforcement in plugin + backend |
+| Consent requires in-game action | Time-limited console commands executed in-game |
+| Platform cannot grant consent | No server-side toggle enables collection |
+| Consent revocation is immediate | Local consent files + enforcement on next event |
+| No retroactive data collection | No buffering or backfill logic present |
+| Certain data is never collected | Plugin contract explicitly excludes categories |

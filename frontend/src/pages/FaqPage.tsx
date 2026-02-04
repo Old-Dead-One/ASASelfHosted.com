@@ -134,6 +134,15 @@ export function FaqPage() {
                 </p>
             </section>
 
+            <section className="space-y-4 mb-8">
+                <h2 className="text-xl font-semibold text-foreground">
+                    How do I delete my account?
+                </h2>
+                <p className="text-muted-foreground">
+                    You can permanently delete your account and all associated data (profile, servers, clusters, favorites) from the <Link to="/data-rights" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">Data Rights Request</Link> page. Sign in, then use the &quot;Delete my account&quot; section. You must confirm that you understand the action is <strong>permanent and cannot be reversed</strong>. After deletion you will be signed out. If you cannot sign in or prefer not to use self-service, you can <Link to="/contact" className="text-primary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5">contact us</Link> to request account deletion.
+                </p>
+            </section>
+
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-foreground">
                     Why does ASA Self-Hosted exist?

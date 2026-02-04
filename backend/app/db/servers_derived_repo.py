@@ -18,6 +18,7 @@ class ServerClusterInfo(TypedDict):
     key_version: int
     heartbeat_grace_seconds: int | None
     public_key_ed25519: str | None
+    hosting_provider: str | None  # For consent gate: only self_hosted may ingest
 
 
 class Heartbeat(TypedDict):
@@ -137,8 +138,9 @@ class ServersDerivedRepository(ABC):
         server_id: str,
         received_at: datetime,
         heartbeat_timestamp: datetime,
+        status: ServerStatus,
         players_current: int | None,
         players_capacity: int | None,
     ) -> None:
-        """Fast UX update of last_seen/players; must NOT overwrite derived metrics."""
+        """Fast UX update of last_seen/players/effective_status; must NOT overwrite derived metrics."""
         raise NotImplementedError

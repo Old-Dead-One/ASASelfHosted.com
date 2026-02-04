@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { useServers } from '@/hooks/useServers'
 import type { DirectoryView } from '@/types'
 
-export function HomePage() {
+export function HomePage({ showSpotlight = true }: { showSpotlight?: boolean } = {}) {
     const [filters, setFilters] = useState<ServerFiltersType>({ view: 'compact', limit: 24 })
     const { total } = useServers(filters)
 
@@ -27,9 +27,11 @@ export function HomePage() {
                 </p>
             </div>
             {/* Spotlight Carousel — above directory */}
-            <section className="mb-8" aria-label="Spotlight servers">
-                <SpotlightCarousel />
-            </section>
+            {showSpotlight && (
+                <section className="mb-4" aria-label="Spotlight servers">
+                    <SpotlightCarousel />
+                </section>
+            )}
             {/* Server Directory */}
             <section aria-labelledby="directory-heading" className="mb-4">
                 <ServerFilters filters={filters} onFiltersChange={setFilters} />

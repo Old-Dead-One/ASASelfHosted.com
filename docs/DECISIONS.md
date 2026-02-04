@@ -2,20 +2,20 @@
 
 **These decisions override any mismatches between design documents unless explicitly revised later.**
 
-**Last Updated:** 2026-01-22
+**Last Updated:** 2026-02-03
 
 ---
 
 ## 1. Agent vs ASA Server API Plugin — MVP Scope
 
-**Decision:** MVP builds the **Local Host Agent first**. Plugin is post-MVP/optional.
+**Decision:** MVP ships the **Local Host Agent** only. The **ASA Server API plugin is post-MVP**; we will build it after the site gains traction.
 
-- **Agent (MVP):** Verification and heartbeat reporter (runs outside ASA ecosystem)
-- **Plugin (post-MVP):** Deeper automation + in-game consent flows + richer telemetry
+- **Local Host Agent (MVP):** Verification and heartbeat reporter that runs outside the ASA ecosystem. Delivers reliable server status without depending on in-game mods or plugin maintenance.
+- **ASA Server API Plugin (post-MVP):** Deeper automation, in-game consent flows, richer telemetry, and optional features (e.g. auto wipe/mod reporting, password sync, onJoin signals). Built once the platform has traction and the plugin investment is justified.
 
-**Rationale:** Reliable server status verification without depending on in-game mod/plugin constraints.
+**Rationale:** Reliable verification first with the agent; add the plugin when demand and resources support it.
 
-**Note:** Feature List mentions "Plugin" in MVP scope - this refers to the Agent, not the ASA Server API plugin.
+**Note:** Feature List and Dev Plan sometimes use "Plugin" in MVP context—for MVP scope, that means the Local Host Agent (heartbeat + verification), not the ASA Server API plugin.
 
 ---
 

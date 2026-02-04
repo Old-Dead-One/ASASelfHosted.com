@@ -70,3 +70,21 @@ class DirectoryClustersRepository(ABC):
             Unlisted clusters return None (public directory is public-only).
         """
         ...
+
+    @abstractmethod
+    async def get_cluster_by_slug(
+        self,
+        slug: str,
+        now_utc: datetime | None = None,
+    ) -> DirectoryCluster | None:
+        """
+        Get cluster by slug (public directory).
+
+        Args:
+            slug: Cluster slug (URL-safe identifier)
+            now_utc: Request handling time for consistency
+
+        Returns:
+            DirectoryCluster if found and public, None otherwise.
+        """
+        ...

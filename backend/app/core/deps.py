@@ -7,7 +7,7 @@ Reusable dependencies for authentication and authorization.
 from fastapi import Request
 
 from app.core.config import get_settings
-from app.core.errors import UnauthorizedError
+from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import (
     UserIdentity,
     create_local_bypass_user,
@@ -135,6 +135,25 @@ async def require_user(request: Request) -> UserIdentity:
 
 # Alias for consistency
 get_current_user = require_user
+
+
+def _admin_user_ids() -> list[str]:
+    """Parse ADMIN_USER_IDS config into list of UUIDs."""
+    raw = get_settings().ADMIN_USER_IDS or ""
+    return [uid.strip() for uid in raw.split(",") if uid.strip()]
+
+
+async def require_admin(request: Request) -> UserIdentity:
+    """
+    Admin-only dependency: requires authenticated user and user_id in ADMIN_USER_IDS.
+
+    Use for admin endpoints (rejections summary, hide server, incident notes).
+    """
+    user = await require_user(request)
+    admin_ids = _admin_user_ids()
+    if not admin_ids or user.user_id not in admin_ids:
+        raise ForbiddenError("Admin access required")
+    return user
 
 
 # Usage in FastAPI endpoints:

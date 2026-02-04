@@ -89,6 +89,7 @@ class FakeDerivedRepo(ServersDerivedRepository):
         server_id: str,
         received_at: datetime,
         heartbeat_timestamp: datetime,
+        status,
         players_current,
         players_capacity,
     ) -> None:
@@ -97,6 +98,7 @@ class FakeDerivedRepo(ServersDerivedRepository):
                 server_id,
                 received_at,
                 heartbeat_timestamp,
+                status,
                 players_current,
                 players_capacity,
             )

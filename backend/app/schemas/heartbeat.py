@@ -23,7 +23,7 @@ class HeartbeatRequest(BaseSchema):
     key_version: int  # Key version (must match cluster's key_version)
     timestamp: datetime  # Agent-reported time (UTC, checked for freshness)
     heartbeat_id: str  # UUID string for replay protection (unique per server_id)
-    status: Literal["online", "offline"]  # Server status
+    status: Literal["online", "offline", "unknown"]  # Server status (unknown = agent could not determine)
     map_name: str | None = None  # Map name (optional)
     players_current: int | None = None  # Current player count (optional)
     players_capacity: int | None = None  # Player capacity (optional)
@@ -36,10 +36,13 @@ class HeartbeatResponse(BaseSchema):
     """
     Schema for heartbeat response.
 
-    Indicates whether heartbeat was received, processed, and if it was a replay.
+    Indicates whether heartbeat was received, result type, and if it was a replay.
+    Use HTTP 202 for accepted/duplicate; 4xx for client errors; 426 for upgrade required.
     """
 
-    received: bool  # True if heartbeat was accepted
+    received: bool  # True if heartbeat was accepted (202)
     server_id: str  # Server ID that sent the heartbeat
     processed: bool = False  # True if fast-path update succeeded
     replay: bool = False  # True if heartbeat_id was duplicate (replay detected)
+    result: Literal["accepted", "duplicate", "no_change"] | None = None  # Clarifies outcome when 202
+    message: str | None = None  # Optional: e.g. "agent_version_too_old" when 426

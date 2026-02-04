@@ -150,6 +150,16 @@ class SupabaseServersRepository(ServersRepository):
             "This may indicate a view refresh issue or hosting_provider mismatch."
         )
 
+    async def count_owner_servers(self, user_id: str) -> int:
+        """Count servers owned by user."""
+        result = (
+            self._client.table("servers")
+            .select("id")
+            .eq("owner_user_id", user_id)
+            .execute()
+        )
+        return len(result.data) if result.data else 0
+
     async def get_server(
         self, server_id: str, user_id: str | None = None
     ) -> DirectoryServer | None:

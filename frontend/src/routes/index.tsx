@@ -4,7 +4,7 @@
  * Defines all application routes.
  */
 
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { HomePage } from '@/pages/HomePage'
 import { ServerPage } from '@/pages/ServerPage'
@@ -23,6 +23,8 @@ import { DataRightsPage } from '@/pages/DataRightsPage'
 import { ContactPage } from '@/pages/ContactPage'
 import { FaqPage } from '@/pages/FaqPage'
 import { AboutPage } from '@/pages/AboutPage'
+import { ClustersPage } from '@/pages/ClustersPage'
+import { ClusterPage } from '@/pages/ClusterPage'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
 export const router = createBrowserRouter([
@@ -35,8 +37,20 @@ export const router = createBrowserRouter([
                 element: <HomePage />,
             },
             {
+                path: 'servers',
+                element: <HomePage showSpotlight={false} />,
+            },
+            {
                 path: 'servers/:serverId',
                 element: <ServerPage />,
+            },
+            {
+                path: 'clusters',
+                element: <Outlet />,
+                children: [
+                    { index: true, element: <ClustersPage /> },
+                    { path: ':slug', element: <ClusterPage /> },
+                ],
             },
             {
                 path: 'login',

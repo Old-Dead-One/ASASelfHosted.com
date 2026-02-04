@@ -1,10 +1,19 @@
-# Sprint 8 – TODO (open items from all sprints)
+# TODO — Backlog (open items across sprints)
 
-Sprint 7 core is complete (trust pages, SpotlightCarousel, maps, Discord/website URLs). This doc holds **remaining open items** from Sprint 7 and earlier, plus pre-launch and Phase 1.5 work. No code here—task list only.
+This doc is the **single backlog** for the project: remaining open items from Sprint 7 and earlier, pre-launch work, and future sprints (e.g. Sprint 9). No code here—task list only.
+
+Sprint 8 playbook (8.1–8.8) is complete; see [SPRINT_8.md](SPRINT_8.md).
 
 ---
 
-## From Sprint 7 (deferred to Sprint 8)
+## Sprint 9 (planned)
+
+- [x] Define Sprint 9 playbook and goals → **See [SPRINT_9.md](SPRINT_9.md)** (launch readiness + agent enablement).
+- [ ] Prioritize backlog items below for Sprint 9 vs Phase 1.5 (playbook defines in-scope vs Phase 1.5).
+
+---
+
+## From Sprint 7 (deferred)
 
 ### SpotlightCarousel – completed in Sprint 7
 
@@ -63,7 +72,7 @@ Sprint 7 core is complete (trust pages, SpotlightCarousel, maps, Discord/website
 
 ### Dashboard row view
 
-- [ ] Add row/table view for dashboard (owner’s server list) in addition to card view; allow switch like home directory.
+- [ ] Add row/table view for dashboard (owner's server list) in addition to card view; allow switch like home directory.
 
 ---
 
@@ -96,7 +105,7 @@ Sprint 7 core is complete (trust pages, SpotlightCarousel, maps, Discord/website
 
 ### Contact and email support
 
-- [ ] Wire Contact page (`/contact`): form and/or email so “contact us” works everywhere (Legal §13, Data Rights, footer).
+- [ ] Wire Contact page (`/contact`): form and/or email so "contact us" works everywhere (Legal §13, Data Rights, footer).
 - [ ] Add email support where needed (e.g. contact form submission, reply-to).
 
 ### Per-user limits
@@ -117,20 +126,20 @@ Sprint 7 core is complete (trust pages, SpotlightCarousel, maps, Discord/website
 
 - [ ] Backend: generate **private and public keys** (e.g. Ed25519) for the agent; store public key; return private key **one-time only** (used by agent to sign heartbeats to asaselfhosted.com). E.g. `POST /api/v1/clusters/{id}/generate-keys` or per-server depending on model.
 - [ ] Backend: agent instance management (create/list instances, link to servers) if applicable.
-- [ ] Frontend: key generation in **dashboard** (see “Full user dashboard” above)—trigger generation, one-time private key display (copy), revocation/rotation UI, agent install and configure instructions.
+- [ ] Frontend: key generation in **dashboard** (see "Full user dashboard" above)—trigger generation, one-time private key display (copy), revocation/rotation UI, agent install and configure instructions.
 - *Note:* Agent signs heartbeats with the private key; backend verifies with stored public key. Clarify token vs. key model and cluster vs. server scope if needed.
 
 ### Local host agent client (high priority, can ship without)
 
 - [ ] Node.js/TypeScript (or Python) agent service.
-- [ ] Local web UI: instance table, R/Y/G lights, “Test now”, logs.
+- [ ] Local web UI: instance table, R/Y/G lights, "Test now", logs.
 - [ ] Checks: process, port; heartbeat push (e.g. every 300s).
-- [ ] Windows .exe packaging; “Run at startup” helper.
+- [ ] Windows .exe packaging; "Run at startup" helper.
 - *Note:* Backend heartbeat endpoint ready; platform is soft-launch ready without agent.
 
 ---
 
-## Phase 1.5 (post-launch, not Sprint 8 required)
+## Phase 1.5 (post-launch)
 
 - [ ] Cluster pages (read-only or owner management).
 - [ ] Top 100 / Hot / Stability / Activity carousels.
@@ -153,12 +162,13 @@ Sprint 7 core is complete (trust pages, SpotlightCarousel, maps, Discord/website
 
 - **Trust pages spec:** docs/TRUST_PAGES.md (content and acceptance criteria for /verification, /consent).
 - **Pre-deploy checklist:** FinalCheck.md.
-- **MVP vs. design docs:** GAP_ANALYSIS.md (MVP Complete Analysis section).
+- **Status vs design / what’s left:** docs/REMAINING_VS_DESIGN.md.
+- **Sprint 8:** docs/SPRINT_8.md.
 - **Completed (launch-ready):** Trust pages, SpotlightCarousel (limit 8, wrap-around), maps + filter + ServerForm, Discord/website URLs.
-- **Trust claims audit:** docs/Trust_Claims_Audit.md.
+- **Trust claims audit:** docs/TRUST_PAGES.md (Audit section).
 - **Server images spec:** docs/SERVER_IMAGES.md.
 - **Doc index:** docs/WORKING_DOCS.md. **Steam OAuth:** docs/STEAM_OAUTH_TODO.md when implementing.
 
 ---
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-03

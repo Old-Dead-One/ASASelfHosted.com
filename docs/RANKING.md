@@ -1,6 +1,6 @@
 # Ranking and Sort Logic (Directory)
 
-Single source of truth for how directory servers are ranked/sorted. Backend and frontend must align with this contract.
+Single source of truth for how directory servers are ranked/sorted. **Backend and frontend must conform to this doc.**
 
 ---
 
@@ -8,7 +8,9 @@ Single source of truth for how directory servers are ranked/sorted. Backend and 
 
 - **Ranking** here means **sort order** of directory results. Users choose a **rank_by** metric and **order** (asc/desc). Results are ordered by that metric with a tie-break on `id`.
 - **Rankings are not sold.** Verification and placement do not affect sort order; order is determined only by the chosen metric and data.
-- **rank_position** (e.g. "Rank #5") and **rank_delta_24h** (trending) are optional. Current backend returns `null` for both; they can be implemented later (e.g. position for first page only, delta from historical snapshots).
+- **rank_position** (e.g. "Rank #5") and **rank_delta_24h** (trending) are **not yet computed**; the backend returns `null` for both. Do not display "Rank #N" or "trending" unless the backend returns these fields. They can be implemented later (e.g. position for first page only, delta from historical snapshots).
+- **NULLs last**: For numeric sort columns (players, quality, uptime), NULL values sort last regardless of asc/desc so servers with no data don't dominate.
+- **Pagination**: Cursor-based; next page uses the last item's sort value + id for consistent order across pages. No global rank index is required for MVP.
 
 ---
 

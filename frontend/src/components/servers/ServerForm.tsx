@@ -7,7 +7,7 @@
 import { useState, FormEvent, useEffect, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ServerStatus, GameMode, Ruleset } from '@/types'
-import { listMyClusters, type Cluster, resolveMods, type ResolvedMod, apiRequest } from '@/lib/api'
+import { listMyClusters, type Cluster, resolveMods, type ResolvedMod, apiRequest, getServerAgentKeyStatus, generateServerKeys, type ServerKeyPairResponse } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 
 const OTHER_MAP_VALUE = '__other__'
@@ -47,6 +47,8 @@ export interface ServerFormData {
 }
 
 interface ServerFormProps {
+    /** When editing, pass the server id so the form can show agent key section. */
+    serverId?: string
     initialData?: Partial<ServerFormData>
     onSubmit: (data: ServerFormData) => Promise<void>
     onCancel?: () => void
@@ -55,6 +57,7 @@ interface ServerFormProps {
 }
 
 export function ServerForm({
+    serverId,
     initialData,
     onSubmit,
     onCancel,
@@ -88,6 +91,15 @@ export function ServerForm({
     const [resolvedMods, setResolvedMods] = useState<ResolvedMod[]>([])
     const [resolvingMods, setResolvingMods] = useState(false)
     const [modResolveError, setModResolveError] = useState<string | null>(null)
+    const [serverKeyGenerating, setServerKeyGenerating] = useState(false)
+    const [serverKeyResult, setServerKeyResult] = useState<ServerKeyPairResponse | null>(null)
+    const [serverKeyCopied, setServerKeyCopied] = useState(false)
+
+    const { data: agentKeyStatus, refetch: refetchAgentKeyStatus } = useQuery({
+        queryKey: ['server-agent-key-status', serverId],
+        queryFn: () => getServerAgentKeyStatus(serverId!),
+        enabled: !!serverId,
+    })
 
     const { data: mapsData } = useQuery({
         queryKey: ['maps'],
@@ -173,6 +185,8 @@ export function ServerForm({
     const hasRuleset = ['vanilla', 'vanilla_qol', 'modded'].some((r) => formData.rulesets.includes(r as Ruleset))
     const canSubmit =
         formData.is_self_hosted_confirmed &&
+        formData.name.trim() !== '' &&
+        formData.join_address.trim() !== '' &&
         formData.map_name.trim() !== '' &&
         formData.game_mode !== '' &&
         formData.platform !== '' &&
@@ -422,8 +436,18 @@ export function ServerForm({
                             {clusters.length === 0 && !loadingClusters && <p className="text-xs text-muted-foreground mt-0.5">No clusters yet.</p>}
                         </div>
                         <div>
-                            <label htmlFor="join_address" className="label-tek">Join Address</label>
-                            <input id="join_address" type="text" value={formData.join_address} onChange={(e) => setFormData({ ...formData, join_address: e.target.value })} maxLength={256} className="input-tek" />
+                            <label htmlFor="join_address" className="label-tek">
+                                Join Address <span className={!formData.join_address.trim() ? 'text-destructive' : ''}>*</span>
+                            </label>
+                            <input
+                                id="join_address"
+                                type="text"
+                                value={formData.join_address}
+                                onChange={(e) => setFormData({ ...formData, join_address: e.target.value })}
+                                required
+                                maxLength={256}
+                                className="input-tek"
+                            />
                         </div>
                     </div>
 
@@ -510,6 +534,86 @@ export function ServerForm({
                 </div>
             </section>
 
+            {serverId && (
+                <section className="mt-4 rounded-lg border border-input bg-muted/20 p-3 space-y-2" aria-labelledby="server-agent-key-heading">
+                    <h3 id="server-agent-key-heading" className="text-sm font-medium text-foreground">Agent key</h3>
+                    <p className="text-xs text-muted-foreground">
+                        Optional: use a per-server key so heartbeats are verified with this server instead of the cluster key.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {agentKeyStatus && (
+                            <>
+                                <span className="text-sm text-muted-foreground">
+                                    Key status: {agentKeyStatus.has_key ? 'active' : 'none'}
+                                    {agentKeyStatus.has_key && ` (v${agentKeyStatus.key_version})`}
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={serverKeyGenerating}
+                                    onClick={async () => {
+                                        setServerKeyGenerating(true)
+                                        setServerKeyResult(null)
+                                        setServerKeyCopied(false)
+                                        try {
+                                            const res = await generateServerKeys(serverId)
+                                            setServerKeyResult(res)
+                                            await refetchAgentKeyStatus()
+                                        } catch {
+                                            setError('Failed to generate server keys. Please try again.')
+                                        } finally {
+                                            setServerKeyGenerating(false)
+                                        }
+                                    }}
+                                >
+                                    {agentKeyStatus.has_key ? 'Rotate key' : 'Generate key'}
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                    {serverKeyResult && (
+                        <div className="p-3 rounded-md border-2 border-primary/50 bg-primary/5">
+                            <p className="text-sm font-medium text-foreground mb-2">Private key (copy now — we won&apos;t show this again)</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <code className="flex-1 min-w-0 text-xs break-all bg-muted px-2 py-2 rounded">
+                                    {serverKeyResult.private_key}
+                                </code>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={async () => {
+                                        try {
+                                            await navigator.clipboard.writeText(serverKeyResult.private_key)
+                                            setServerKeyCopied(true)
+                                            window.setTimeout(() => setServerKeyCopied(false), 1500)
+                                        } catch {
+                                            setError('Failed to copy. Please copy manually.')
+                                        }
+                                    }}
+                                >
+                                    {serverKeyCopied ? 'Copied!' : 'Copy'}
+                                </Button>
+                            </div>
+                            {serverKeyResult.warning && <p className="text-sm text-muted-foreground mt-2">{serverKeyResult.warning}</p>}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => {
+                                    setServerKeyResult(null)
+                                    setServerKeyCopied(false)
+                                }}
+                            >
+                                Dismiss
+                            </Button>
+                        </div>
+                    )}
+                </section>
+            )}
+
             <div className="border-t border-input/60 pt-4 mt-2 flex gap-3 items-center">
                 <Button
                     type="submit"
@@ -517,6 +621,7 @@ export function ServerForm({
                     size="sm"
                     disabled={loading || !canSubmit}
                     aria-label={submitLabel}
+                    title={loading ? 'Saving…' : !canSubmit ? 'Complete required fields to save' : undefined}
                 >
                     {loading ? 'Saving...' : submitLabel}
                 </Button>

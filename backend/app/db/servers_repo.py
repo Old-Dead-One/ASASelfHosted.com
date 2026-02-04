@@ -56,6 +56,19 @@ class ServersRepository(ABC):
         pass
 
     @abstractmethod
+    async def count_owner_servers(self, user_id: str) -> int:
+        """
+        Count servers owned by a user.
+
+        Args:
+            user_id: Owner user ID
+
+        Returns:
+            Number of servers owned by user
+        """
+        pass
+
+    @abstractmethod
     async def list_owner_servers(
         self, user_id: str
     ) -> Sequence[DirectoryServer]:

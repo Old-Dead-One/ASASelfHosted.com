@@ -2,7 +2,7 @@
 
 File and folder structure for ASASelfHosted.com development. For a full index of working docs, see **docs/WORKING_DOCS.md**.
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-03
 
 ## Root Level Files
 
@@ -12,13 +12,9 @@ asaselfhosted.com/
 ├── frontend/                 # React frontend
 ├── docs/                     # Working docs and reference (see WORKING_DOCS.md)
 │   └── design/               # Canonical design docs (1_DESCRIPTION.txt … 5_Appendix.txt)
-├── DECISIONS.md              # Official decisions (override design docs)
-├── DEV_NOTES.md              # Dev context, ports, workflow; links to DECISIONS
-├── FinalCheck.md             # Pre-launch checklist
-├── GAP_ANALYSIS.md           # Implementation vs design; MVP analysis
+├── DEV_NOTES.md              # Dev context, ports, workflow; links to docs
 ├── INSTALL.md                # Installation instructions
 ├── README.md                 # Project overview
-├── SPRINT_8_TODO.md          # Single backlog (all open items)
 ├── SUPABASE_SETUP.md         # Supabase setup guide
 ```
 
@@ -27,6 +23,13 @@ asaselfhosted.com/
 ```
 docs/
 ├── WORKING_DOCS.md            # Index of all working docs (start here)
+├── DECISIONS.md               # Official decisions (override design docs)
+├── FinalCheck.md              # Pre-launch checklist
+├── TODO.md                    # Single backlog (all open items)
+├── REMAINING_VS_DESIGN.md     # What's left vs design docs; priority summary
+├── OPERATIONS.md              # Ingest, violation policy, responsibility map, jobs, failure modes, alerting
+├── SPRINT_8.md                # Sprint 8 playbook + status
+├── SPRINT_9.md                # Sprint 9 playbook + status
 ├── design/                    # Canonical product scope
 │   ├── 1_DESCRIPTION.txt      # Project vision
 │   ├── 2_FEATURE_LIST.txt    # Feature list (MVP scope)
@@ -38,8 +41,7 @@ docs/
 ├── RANKING.md                 # Ranking/sort contract (rank_by, quality_score)
 ├── REFERENCE_SCHEMA_SPRINT0_TO_5.md
 ├── SERVER_IMAGES.md           # Server images feature spec
-├── Trust_Claims_Audit.md      # Trust claims vs enforcement (audits)
-├── TRUST_PAGES.md             # Trust pages (/verification, /consent) content spec
+├── TRUST_PAGES.md             # Trust pages (/verification, /consent) + audit table
 └── STEAM_OAUTH_TODO.md        # Steam OAuth implementation notes
 ```
 
@@ -311,6 +313,6 @@ frontend/
 - Directory ranking, quality score, facets; maps table; Discord/website URLs
 - Trust pages (Verification, Consent, Legal, Data Rights, Contact, Terms, About, FAQ)
 - SpotlightCarousel (selection locked, wrap-around); TekCardSurface; server CRUD + favorites
-- GAP_ANALYSIS and MVP analysis updated; Sprint 8 TODO is the active backlog
+- Status vs design and what's left: docs/REMAINING_VS_DESIGN.md; docs/TODO.md is the active backlog
 
-**Current focus:** See SPRINT_8_TODO.md and docs/WORKING_DOCS.md.
+**Current focus:** See docs/TODO.md and docs/WORKING_DOCS.md.

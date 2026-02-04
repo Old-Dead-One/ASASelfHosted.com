@@ -61,10 +61,12 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
             raise RuntimeError("SupabaseServersDerivedRepository not configured")
 
         try:
-            # Get server first
+            # Get server (cluster_id, hosting_provider, and optional per-server agent keys)
             server_response = (
                 self._supabase.table("servers")
-                .select("cluster_id")
+                .select(
+                    "cluster_id,hosting_provider,public_key_ed25519,key_version"
+                )
                 .eq("id", server_id)
                 .limit(1)
                 .execute()
@@ -76,17 +78,23 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
             if not server_data:
                 return None
 
-            cluster_id = server_data[0].get("cluster_id")
+            server_row = server_data[0]
+            cluster_id = server_row.get("cluster_id")
+            hosting_provider = server_row.get("hosting_provider")
+            server_public_key = server_row.get("public_key_ed25519")
+            server_key_version = server_row.get("key_version", 1)
+
             if not cluster_id:
-                # Server has no cluster
+                # Server has no cluster; server key alone is not enough (we need grace from cluster or default)
                 return {
                     "cluster_id": None,
-                    "key_version": 1,
+                    "key_version": server_key_version if server_public_key else 1,
                     "heartbeat_grace_seconds": None,
-                    "public_key_ed25519": None,
+                    "public_key_ed25519": server_public_key,
+                    "hosting_provider": hosting_provider,
                 }
 
-            # Get cluster info
+            # Get cluster info (for grace and fallback key when server has no key)
             cluster_response = (
                 self._supabase.table("clusters")
                 .select("id,key_version,heartbeat_grace_seconds,public_key_ed25519")
@@ -99,21 +107,29 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
                 cluster_response.data if hasattr(cluster_response, "data") else []
             )
             if not cluster_data:
-                # Cluster not found
                 return {
                     "cluster_id": cluster_id,
-                    "key_version": 1,
+                    "key_version": server_key_version if server_public_key else 1,
                     "heartbeat_grace_seconds": None,
-                    "public_key_ed25519": None,
+                    "public_key_ed25519": server_public_key,
+                    "hosting_provider": hosting_provider,
                 }
 
             cluster = cluster_data[0]
+            # Prefer server key when set; else use cluster key
+            public_key = server_public_key or cluster.get("public_key_ed25519")
+            key_version = (
+                server_key_version
+                if server_public_key
+                else cluster.get("key_version", 1)
+            )
 
             return {
                 "cluster_id": cluster.get("id"),
-                "key_version": cluster.get("key_version", 1),
+                "key_version": key_version,
                 "heartbeat_grace_seconds": cluster.get("heartbeat_grace_seconds"),
-                "public_key_ed25519": cluster.get("public_key_ed25519"),
+                "public_key_ed25519": public_key,
+                "hosting_provider": hosting_provider,
             }
 
         except Exception as e:
@@ -222,23 +238,35 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
     async def update_derived_state(
         self, server_id: str, state: DerivedServerState
     ) -> None:
-        """Update server derived state (does NOT update is_verified)."""
+        """Update server derived state (does NOT update is_verified). Respects badges_frozen (Sprint 8)."""
         if not self._configured or self._supabase is None:
             raise RuntimeError("SupabaseServersDerivedRepository not configured")
 
         try:
-            # Prepare update data
+            # When badges_frozen is true, do not update badge/ranking-derived fields
+            badges_frozen = False
+            try:
+                r = (
+                    self._supabase.table("servers")
+                    .select("badges_frozen")
+                    .eq("id", server_id)
+                    .limit(1)
+                    .execute()
+                )
+                if r.data and len(r.data) > 0:
+                    badges_frozen = r.data[0].get("badges_frozen") is True
+            except Exception:
+                pass
+
+            # Prepare update data; when badges_frozen, omit badge/ranking fields so we don't overwrite
             update_data = {
                 "effective_status": state["effective_status"],
-                "confidence": state["confidence"],
-                "uptime_percent": state.get("uptime_percent"),
-                "quality_score": state.get("quality_score"),
                 "players_current": state.get("players_current"),
                 "players_capacity": state.get("players_capacity"),
                 "last_heartbeat_at": state.get("last_heartbeat_at").isoformat()
                 if state.get("last_heartbeat_at")
                 else None,
-                "status_source": "agent",  # Set status_source to 'agent' when updating from heartbeats
+                "status_source": "agent",
                 "anomaly_players_spike": state.get("anomaly_players_spike"),
                 "anomaly_last_detected_at": state.get(
                     "anomaly_last_detected_at"
@@ -246,6 +274,10 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
                 if state.get("anomaly_last_detected_at")
                 else None,
             }
+            if not badges_frozen:
+                update_data["confidence"] = state["confidence"]
+                update_data["uptime_percent"] = state.get("uptime_percent")
+                update_data["quality_score"] = state.get("quality_score")
 
             # Update servers table
             self._supabase.table("servers").update(update_data).eq(
@@ -262,6 +294,7 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
         server_id: str,
         received_at: datetime,
         heartbeat_timestamp: datetime,
+        status: str,
         players_current: int | None,
         players_capacity: int | None,
     ) -> None:
@@ -272,7 +305,7 @@ class SupabaseServersDerivedRepository(ServersDerivedRepository):
             "last_seen_at": received_at.isoformat(),
             "last_heartbeat_at": heartbeat_timestamp.isoformat(),
             "status_source": "agent",
-            "effective_status": "online",  # worker may correct later
+            "effective_status": status,  # online | offline | unknown from agent
         }
         if players_current is not None:
             update_data["players_current"] = players_current

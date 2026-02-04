@@ -8,8 +8,10 @@
 import { useRef } from 'react'
 import { DashboardServerCard } from './DashboardServerCard'
 import { AddServerCard } from './AddServerCard'
+import { PinnedClusterCard } from './PinnedClusterCard'
 import { Button } from '@/components/ui/Button'
 import type { DirectoryServer } from '@/types'
+import type { Cluster } from '@/lib/api'
 
 /* At xl: use 208px cards + 12px gaps so 5×208 + 4×12 = 1088, leaving both borders visible with pl-1 pr-1 */
 const CARD_WIDTH_XL_PX = 208
@@ -44,18 +46,36 @@ type DashboardServer = Pick<
 interface DashboardServersCarouselProps {
     servers: DashboardServer[]
     onAddServer: () => void
+    onAddCluster: () => void
     onEdit: (server: DashboardServer) => void
     onClone: (server: DashboardServer) => void
+    addServerDisabled?: boolean
+    addServerDisabledReason?: string
+    serversUsed?: number
+    serversLimit?: number
+    clustersUsed?: number
+    clustersLimit?: number
+    cluster?: Cluster | null
+    onManageCluster?: () => void
 }
 
 export function DashboardServersCarousel({
     servers,
     onAddServer,
+    onAddCluster,
     onEdit,
     onClone,
+    addServerDisabled,
+    addServerDisabledReason,
+    serversUsed,
+    serversLimit,
+    clustersUsed,
+    clustersLimit,
+    cluster,
+    onManageCluster,
 }: DashboardServersCarouselProps) {
     const scrollRef = useRef<HTMLDivElement>(null)
-    const totalItems = 1 + servers.length
+    const totalItems = 1 + (cluster ? 1 : 0) + servers.length
 
     const scroll = (dir: 'left' | 'right') => {
         const el = scrollRef.current
@@ -88,8 +108,28 @@ export function DashboardServersCarousel({
                     style={{ scrollPaddingLeft: 8, scrollPaddingRight: 8 }}
                 >
                     <div className="flex-shrink-0 w-80 xl:w-[216px] h-full snap-start">
-                        <AddServerCard onClick={onAddServer} />
+                        <AddServerCard
+                            onAddServer={onAddServer}
+                            onAddCluster={onAddCluster}
+                            addServerDisabled={addServerDisabled}
+                            addServerDisabledReason={addServerDisabledReason}
+                            hasCluster={!!cluster}
+                            serversUsed={serversUsed}
+                            serversLimit={serversLimit}
+                            clustersUsed={clustersUsed}
+                            clustersLimit={clustersLimit}
+                        />
                     </div>
+                    {cluster && onManageCluster && (
+                        <div className="flex-shrink-0 w-80 xl:w-[216px] h-full snap-start">
+                            <PinnedClusterCard
+                                cluster={cluster}
+                                clustersUsed={clustersUsed}
+                                clustersLimit={clustersLimit}
+                                onManage={onManageCluster}
+                            />
+                        </div>
+                    )}
                     {servers.map((server) => (
                         <div key={server.id} className="flex-shrink-0 w-80 xl:w-[216px] h-full snap-start">
                             <DashboardServerCard
@@ -119,12 +159,12 @@ export function DashboardServersCarousel({
             </div>
 
             {totalItems > 3 && (
-                <div className="flex justify-center gap-2 mt-2">
+                <div className="flex items-center justify-center gap-2">
                     {[...Array(Math.min(totalItems, 5))].map((_, i) => (
                         <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" aria-hidden />
                     ))}
                     {totalItems > 5 && (
-                        <span className="text-xs text-muted-foreground ml-1">+{totalItems - 5} more</span>
+                        <span className="text-xs text-muted-foreground ml-1 leading-none">+{totalItems - 5}</span>
                     )}
                 </div>
             )}

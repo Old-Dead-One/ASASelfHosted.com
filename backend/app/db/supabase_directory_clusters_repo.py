@@ -10,6 +10,7 @@ from typing import Sequence
 
 from app.core.config import get_settings
 from app.core.errors import DomainValidationError
+from app.core.supabase import get_supabase_admin
 from app.db.directory_clusters_repo import DirectoryClustersRepository
 from app.schemas.directory import ClusterVisibility, DirectoryCluster, SortOrder
 from app.utils.cursor import create_cursor, parse_cursor
@@ -199,11 +200,16 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
         if has_next:
             data = data[:limit]  # Keep only limit items
 
+        # Server counts: use admin client (anon may not have SELECT on servers)
+        cluster_ids = [str(r.get("id")) for r in data if r.get("id")]
+        counts_by_id = await self._get_server_counts_for_clusters(cluster_ids)
+
         # Convert to DirectoryCluster objects
         clusters: list[DirectoryCluster] = []
         last_row = None
         for row in data:
             try:
+                cid = str(row.get("id"))
                 # Parse timestamps
                 created_at_str = row.get("created_at")
                 updated_at_str = row.get("updated_at")
@@ -226,7 +232,7 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
                     updated_at = updated_at.replace(tzinfo=timezone.utc)
 
                 cluster = DirectoryCluster(
-                    id=str(row.get("id")),
+                    id=cid,
                     name=str(row.get("name")),
                     slug=str(row.get("slug")),
                     visibility=row.get(
@@ -234,7 +240,7 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
                     ),  # Should be "public" or "unlisted"
                     created_at=created_at,
                     updated_at=updated_at,
-                    server_count=0,  # TODO: Add server count if needed
+                    server_count=counts_by_id.get(cid, 0),
                 )
                 clusters.append(cluster)
                 last_row = row
@@ -268,6 +274,34 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
                 next_cursor = create_cursor(sort_by, order, last_sort_value, last_id)
 
         return clusters, next_cursor
+
+    async def _get_server_counts_for_clusters(
+        self, cluster_ids: list[str]
+    ) -> dict[str, int]:
+        """Return map of cluster_id -> server count. Uses admin client."""
+        if not cluster_ids:
+            return {}
+        admin = get_supabase_admin()
+        if not admin:
+            return {cid: 0 for cid in cluster_ids}
+        try:
+            r = (
+                admin.table("servers")
+                .select("cluster_id")
+                .in_("cluster_id", cluster_ids)
+                .execute()
+            )
+            data = r.data if hasattr(r, "data") else []
+            counts: dict[str, int] = {cid: 0 for cid in cluster_ids}
+            for row in data:
+                cid = row.get("cluster_id")
+                if cid:
+                    cid_str = str(cid)
+                    if cid_str in counts:
+                        counts[cid_str] = counts[cid_str] + 1
+            return counts
+        except Exception:
+            return {cid: 0 for cid in cluster_ids}
 
     async def get_cluster(
         self,
@@ -338,18 +372,100 @@ class SupabaseDirectoryClustersRepository(DirectoryClustersRepository):
             if updated_at.tzinfo is None:
                 updated_at = updated_at.replace(tzinfo=timezone.utc)
 
+            cid = str(row.get("id"))
+            count = 0
+            try:
+                counts = await self._get_server_counts_for_clusters([cid])
+                count = counts.get(cid, 0)
+            except Exception:
+                pass
             cluster = DirectoryCluster(
-                id=str(row.get("id")),
+                id=cid,
                 name=str(row.get("name")),
                 slug=str(row.get("slug")),
                 visibility=row.get("visibility"),
                 created_at=created_at,
                 updated_at=updated_at,
-                server_count=0,  # TODO: Add server count if needed
+                server_count=count,
             )
             return cluster
 
         except Exception as e:
             raise RuntimeError(
                 f"Failed to query clusters table for cluster {cluster_id}: {str(e)}"
+            ) from e
+
+    async def get_cluster_by_slug(
+        self,
+        slug: str,
+        now_utc: datetime | None = None,
+    ) -> DirectoryCluster | None:
+        """
+        Get cluster by slug from Supabase (public directory).
+
+        Returns cluster if found and visibility is public; None otherwise.
+        """
+        if not self._configured:
+            error_msg = "SupabaseDirectoryClustersRepository not configured"
+            if self._config_error:
+                error_msg += f": {self._config_error}"
+            raise RuntimeError(error_msg)
+
+        if self._supabase is None:
+            raise RuntimeError("Supabase client not initialized")
+
+        try:
+            select_columns = "id,name,slug,visibility,created_at,updated_at"
+            response = (
+                self._supabase.table("clusters")
+                .select(select_columns)
+                .eq("slug", slug)
+                .eq("visibility", "public")
+                .limit(1)
+                .execute()
+            )
+
+            data = response.data if hasattr(response, "data") else []
+            if not data:
+                return None
+
+            row = data[0]
+            created_at_str = row.get("created_at")
+            updated_at_str = row.get("updated_at")
+
+            created_at = (
+                datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                if created_at_str
+                else datetime.now(timezone.utc)
+            )
+            updated_at = (
+                datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                if updated_at_str
+                else datetime.now(timezone.utc)
+            )
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=timezone.utc)
+
+            cid = str(row.get("id"))
+            count = 0
+            try:
+                counts = await self._get_server_counts_for_clusters([cid])
+                count = counts.get(cid, 0)
+            except Exception:
+                pass
+
+            return DirectoryCluster(
+                id=cid,
+                name=str(row.get("name")),
+                slug=str(row.get("slug")),
+                visibility=row.get("visibility"),
+                created_at=created_at,
+                updated_at=updated_at,
+                server_count=count,
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to query clusters by slug {slug}: {str(e)}"
             ) from e

@@ -5,7 +5,7 @@
  * Used by ServerCard (directory, Spotlight) and DashboardServerCard so styling is not duplicated.
  */
 
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 interface TekCardSurfaceProps {
     /** Card content; omit for skeleton/placeholder cards */
@@ -14,6 +14,8 @@ interface TekCardSurfaceProps {
     className?: string
     /** Inner content area: padding and flex (e.g. p-6, p-3) */
     contentClassName?: string
+    /** Optional inline style (useful for overriding --ring per card) */
+    style?: CSSProperties
 }
 
 const OUTER_BASE =
@@ -23,9 +25,10 @@ export function TekCardSurface({
     children = null,
     className = '',
     contentClassName = 'p-6',
+    style,
 }: TekCardSurfaceProps) {
     return (
-        <div className={`${OUTER_BASE} ${className}`.trim()}>
+        <div className={`${OUTER_BASE} ${className}`.trim()} style={style}>
             <div className="absolute inset-0 bg-tek-wall" aria-hidden />
             <div className="absolute inset-0 tek-seam opacity-70 pointer-events-none" aria-hidden />
             <div

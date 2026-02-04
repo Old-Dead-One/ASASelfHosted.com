@@ -2,6 +2,8 @@
 
 Use this checklist before deploying to production.
 
+**For a single Must/Should/Optional list for closed-group testing**, see **[docs/RELEASE_READINESS.md](RELEASE_READINESS.md)**.
+
 ---
 
 ## Pre-deploy checklist
@@ -14,6 +16,8 @@ Use this checklist before deploying to production.
 - [ ] **CORS** — Backend allows production frontend origin(s) only.
 - [ ] **Rate limiting / abuse** — Consider rate limits on auth and directory endpoints if not already in place.
 - [ ] **Monitoring** — Sentry or equivalent configured (optional but recommended).
+- [ ] **Monitoring mode UI** — Verify "manual monitoring" vs "local agent (heartbeat)" is wired correctly: if status is not being updated by heartbeats, treat it as manually monitored and reflect this on the Server page "Monitoring" card.
+- [ ] **Breadcrumb navigation** — Add a breadcrumb (path-based navigation) at the top of every page, above the page title.
 - [ ] **Docs** — README, INSTALL, SUPABASE_SETUP, and env examples are up to date. Trust pages content and acceptance criteria: **docs/TRUST_PAGES.md**.
 
 ---
@@ -31,9 +35,27 @@ Full spec: **docs/TRUST_PAGES.md**.
 
 ---
 
+## Sprint 9 completion (pre-launch log)
+
+As of Sprint 9 the following are implemented and aligned with policy:
+
+- **Contact:** Contact page uses mailto/support email; handling flow in **docs/OPERATIONS.md** §7.
+- **Per-user limits:** MAX_SERVERS_PER_USER enforced in backend; dashboard shows "X of Y servers" and disables Add Server at limit; 403 `server_limit_reached` on create when at limit.
+- **Data rights:** Account deletion is documented as "by request" (manual process) in **docs/OPERATIONS.md** §8; Data Rights and Privacy Policy state "by request" and link to Contact.
+- **Key generation:** Dashboard "Agent verification setup" lists clusters and offers Generate/Rotate key; private key shown once with copy and warning.
+- **Dashboard hub:** Favorites section (list + unfavorite); "Privacy & Consent (In-Game)" placeholder with link to Consent page; advanced controls marked "Coming soon."
+- **Ranking:** **docs/RANKING.md** is canonical; backend and frontend conform (sort labels, NULLs last, no false "Rank #N" when null).
+- **Trust audit:** Consent, Verification, Privacy, Data Rights pages audited; no claims that imply automatic collection, retroactive data, or server-side enablement without consent.
+
+**Known gaps / Phase 1.5 (out of scope for Sprint 9):** Server image uploads, cluster-scoped UX, local agent binary, multi-select ruleset filters, full account settings UI, auto map creation on server add. See **docs/TODO.md**.
+
+**Exceptions:** FinalCheck items that require production (env, DB, email verification, CORS, rate limiting, monitoring) must be verified at deploy time; mark each done or document exceptions when you run the checklist.
+
+---
+
 ## Open development work (before or after deploy)
 
-Development tasks (per-user limits, server card image, contact/email wiring) are tracked in **SPRINT_8_TODO.md**. Before launch, confirm whether any of these are required for your release; if so, implement per that backlog and then run the pre-deploy checklist above.
+Remaining development tasks (e.g. server card image, optional features) are tracked in **docs/TODO.md**. Per-user limits and contact handling are implemented as of Sprint 9. Before launch, confirm any remaining items required for your release; then run the pre-deploy checklist above.
 
 ---
 

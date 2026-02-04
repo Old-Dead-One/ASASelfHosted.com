@@ -11,6 +11,7 @@ Domain routers (servers, clusters, etc.) define their own prefixes and tags.
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     clusters,
     consent,
     directory,
@@ -39,6 +40,7 @@ router.include_router(favorites.router)
 router.include_router(clusters.router)
 router.include_router(verification.router)
 router.include_router(me.router)
+router.include_router(admin.router)
 router.include_router(heartbeat.router)
 router.include_router(consent.router)
 router.include_router(mods.router)

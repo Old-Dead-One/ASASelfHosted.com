@@ -362,6 +362,26 @@ async def list_directory_clusters(
     )
 
 
+@router.get("/clusters/slug/{slug}", response_model=DirectoryCluster)
+async def get_directory_cluster_by_slug(
+    slug: str,
+    repo: DirectoryClustersRepository = Depends(get_directory_clusters_repo),
+    _user: UserIdentity | None = Depends(get_optional_user),
+):
+    """
+    Get cluster details by slug from directory.
+
+    Public endpoint - returns cluster if it's public and found by slug.
+    Use this for public cluster pages (e.g. /clusters/my-cluster).
+    """
+    now_utc = datetime.now(timezone.utc)
+    cluster = await repo.get_cluster_by_slug(slug, now_utc=now_utc)
+    if not cluster:
+        raise NotFoundError("cluster", slug)
+
+    return cluster
+
+
 @router.get("/clusters/{cluster_id}", response_model=DirectoryCluster)
 async def get_directory_cluster(
     cluster_id: str,

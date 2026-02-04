@@ -4,6 +4,8 @@ Tests for server CRUD endpoints.
 Tests create, read, update, delete operations for servers.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -84,3 +86,39 @@ class TestServerCRUD:
         assert response.status_code in (400, 500, 503)
         if response.status_code == 400:
             assert "self_hosted" in response.text.lower()
+
+    @patch("app.api.v1.servers.get_settings")
+    @patch("app.api.v1.servers.get_servers_repo")
+    def test_create_server_at_limit_returns_403(
+        self, mock_get_repo, mock_get_settings, auth_headers
+    ):
+        """Test that creating a server when at limit returns 403 and no row is created."""
+        from app.core.deps import require_user
+        from app.core.security import UserIdentity
+
+        async def _fake_require_user(_request=None):
+            return UserIdentity(user_id="test-user-123", email="test@example.com")
+
+        mock_repo = MagicMock()
+        mock_repo.count_owner_servers = AsyncMock(return_value=14)
+        mock_repo.create_server = AsyncMock()
+        mock_get_repo.return_value = mock_repo
+        settings = MagicMock()
+        settings.MAX_SERVERS_PER_USER = 14
+        mock_get_settings.return_value = settings
+
+        app = create_app()
+        app.dependency_overrides[require_user] = _fake_require_user
+        try:
+            test_client = TestClient(app)
+            response = test_client.post(
+                "/api/v1/servers/",
+                json={"name": "Test Server", "description": "Test description"},
+                headers=auth_headers,
+            )
+            assert response.status_code == 403
+            data = response.json()
+            assert data.get("error", {}).get("code") == "server_limit_reached"
+            mock_repo.create_server.assert_not_called()
+        finally:
+            app.dependency_overrides.pop(require_user, None)

@@ -185,3 +185,14 @@ class MockDirectoryClustersRepository(DirectoryClustersRepository):
             if cluster.id == cluster_id:
                 return cluster
         return None
+
+    async def get_cluster_by_slug(
+        self,
+        slug: str,
+        now_utc: datetime | None = None,
+    ) -> DirectoryCluster | None:
+        """Get a single cluster by slug (public directory). Returns None if not found or unlisted."""
+        for cluster in MOCK_CLUSTERS:
+            if cluster.slug == slug and cluster.visibility == "public":
+                return cluster
+        return None
