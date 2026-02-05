@@ -764,6 +764,9 @@ export function DashboardPage() {
                                     contact us
                                 </Link>
                                 .
+                                <span className="block mt-1">
+                                    Limits are per account and do not reset monthly. Delete a server or cluster to free a slot.
+                                </span>
                             </p>
                         </>
                     )}

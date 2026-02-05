@@ -220,7 +220,11 @@ async def create_server(
     count = await repo.count_owner_servers(user.user_id)
     if count >= servers_limit:
         raise APIError(
-            message=f"You have reached the maximum number of servers ({servers_limit}). Delete a server to add another, or contact us to request a higher limit.",
+            message=(
+                f"You have reached the maximum number of servers ({servers_limit}). "
+                "Limits are per account and do not reset monthly. Delete a server to add another, "
+                "or contact us to request a higher limit."
+            ),
             status_code=403,
             error_code="server_limit_reached",
         )
