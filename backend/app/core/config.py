@@ -103,6 +103,14 @@ class Settings(BaseSettings):
     CURSEFORGE_BASE_URL: str = "https://api.curseforge.com"
     CURSEFORGE_ASA_GAME_ID: int | None = None  # Optional: pre-discovered ASA game ID
 
+    # Observed status (EOS matchmaking API)
+    # For ASA, best-effort observation is done via Epic Online Services matchmaking.
+    # These are optional; if not configured, EOS observation returns "unknown" with error "eos_not_configured".
+    EOS_API_ENDPOINT: str = "https://api.epicgames.dev"
+    EOS_DEPLOYMENT_ID: str = "ad9a8feffb3b4b2ca315546f038c3ae2"
+    EOS_CLIENT_ID: str | None = None
+    EOS_CLIENT_SECRET: str | None = None
+
     def validate_non_local(self) -> None:
         """
         Validate required config for non-local environments.

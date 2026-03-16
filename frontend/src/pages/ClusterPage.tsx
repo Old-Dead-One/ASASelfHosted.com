@@ -5,9 +5,9 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Link, useParams, Navigate } from 'react-router-dom'
+import { Link, useParams, Navigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDirectoryClusterBySlug } from '@/lib/api'
+import { getDirectoryClusterById, getDirectoryClusterBySlug } from '@/lib/api'
 import { useServers } from '@/hooks/useServers'
 import { ServerCard } from '@/components/servers/ServerCard'
 import { ServerRow } from '@/components/servers/ServerRow'
@@ -17,19 +17,27 @@ import type { DirectoryView } from '@/types'
 
 export function ClusterPage() {
     const { slug } = useParams<{ slug: string }>()
+    const [searchParams] = useSearchParams()
     const [view, setView] = useState<DirectoryView>('compact')
 
+    const clusterId = searchParams.get('id') || null
     const clusterQuery = useQuery({
-        queryKey: ['directory-cluster-slug', slug],
-        queryFn: () => getDirectoryClusterBySlug(slug!),
-        enabled: !!slug,
+        queryKey: ['directory-cluster', clusterId, slug],
+        queryFn: () => (clusterId ? getDirectoryClusterById(clusterId) : getDirectoryClusterBySlug(slug!)),
+        enabled: !!slug || !!clusterId,
         staleTime: 60_000,
     })
 
-    const filters = useMemo(() => ({ cluster: slug ?? '', limit: 50, view }), [slug, view])
+    const filters = useMemo(
+        () =>
+            clusterId
+                ? ({ cluster_id: clusterId, limit: 50, view } as any)
+                : ({ cluster: slug ?? '', limit: 50, view } as any),
+        [clusterId, slug, view]
+    )
     const { servers, isLoading: serversLoading, error: serversError, total } = useServers(filters)
 
-    if (!slug) {
+    if (!slug && !clusterId) {
         return <Navigate to="/clusters" replace />
     }
 

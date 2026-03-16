@@ -105,6 +105,9 @@ function formDataToCreatePayload(data: ServerFormData): Record<string, unknown> 
         game_mode: data.game_mode || null,
         rulesets: data.rulesets && data.rulesets.length > 0 ? data.rulesets : null,
         effective_status: data.effective_status || null,
+        observation_enabled: data.observation_enabled,
+        observed_host: data.observation_enabled ? (data.observed_host?.trim() || null) : null,
+        observed_port: data.observation_enabled ? (parseInt(data.observed_port, 10) || null) : null,
     }
     if (platformFlags) {
         body.is_pc = platformFlags.is_pc
@@ -137,6 +140,9 @@ function formDataToUpdatePayload(data: ServerFormData): Record<string, unknown> 
         game_mode: data.game_mode || null,
         rulesets: data.rulesets && data.rulesets.length > 0 ? data.rulesets : null,
         effective_status: data.effective_status || null,
+        observation_enabled: data.observation_enabled,
+        observed_host: data.observation_enabled ? (data.observed_host?.trim() || null) : null,
+        observed_port: data.observation_enabled ? (parseInt(data.observed_port, 10) || null) : null,
     }
     if (platformFlags) {
         body.is_pc = platformFlags.is_pc
@@ -175,6 +181,9 @@ function serverToFormData(s: DashboardServer, excludeNameAddressAndMap = false):
         effective_status: s.effective_status ?? '',
         cluster_id: s.cluster_id ?? '',
         platform,
+        observation_enabled: false,
+        observed_host: '',
+        observed_port: '',
     }
 }
 

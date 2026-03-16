@@ -37,15 +37,19 @@ class SupabaseServersRepository(ServersRepository):
         self, user_id: str, server_data: ServerCreateRequest
     ) -> DirectoryServer:
         """Create a new server."""
+        now_iso = datetime.now(timezone.utc).isoformat()
         # Prepare insert data
+        manual_status = server_data.manual_status or server_data.effective_status or "unknown"
         insert_data = {
             "owner_user_id": user_id,
             "name": server_data.name.strip(),
             "description": server_data.description.strip() if server_data.description else None,
             "hosting_provider": server_data.hosting_provider,  # Validated by schema
             "cluster_id": server_data.cluster_id,  # Optional cluster association
-            "effective_status": server_data.effective_status or "unknown",  # Default to 'unknown' if not provided
-            "status_source": None,  # No status source initially
+            "effective_status": server_data.effective_status or manual_status,  # Default to 'unknown' if not provided
+            "manual_status": manual_status,
+            "manual_updated_at": now_iso,
+            "status_source": "manual",
         }
         
         # Basic listing info
@@ -112,6 +116,18 @@ class SupabaseServersRepository(ServersRepository):
                     .insert(insert_data)
                     .execute()
                 )
+            # If insert failed due to missing manual_status columns (pre-031), retry without them
+            elif (e.code in ("PGRST204", "42703")) and (
+                "manual_status" in err_str or "manual_updated_at" in err_str
+            ):
+                insert_data.pop("manual_status", None)
+                insert_data.pop("manual_updated_at", None)
+                # status_source existed in Sprint 0; keep it
+                result = (
+                    self._client.table("servers")
+                    .insert(insert_data)
+                    .execute()
+                )
             # If rulesets or platform columns don't exist yet (migration 015 not run), retry without them
             elif e.code == "42703" and ("rulesets" in err_str or "is_pc" in err_str or "is_console" in err_str or "is_crossplay" in err_str):
                 insert_data.pop("rulesets", None)
@@ -132,6 +148,31 @@ class SupabaseServersRepository(ServersRepository):
             raise RuntimeError("Failed to create server")
 
         server_id = result.data[0]["id"]
+
+        # Observation config (owner-only, optional)
+        # Stored separately to avoid exposing editable probe targets publicly.
+        try:
+            if server_data.observation_enabled is not None:
+                cfg = {
+                    "server_id": server_id,
+                    "observation_enabled": bool(server_data.observation_enabled),
+                    "observed_host": server_data.observed_host.strip()
+                    if server_data.observed_host
+                    else None,
+                    "observed_port": server_data.observed_port,
+                    "observed_probe": "direct",
+                }
+                self._client.table("server_observation_config").insert(cfg).execute()
+        except PostgrestAPIError as e:
+            # If migration not applied yet / schema cache stale, allow server create to succeed.
+            err = str(e).lower()
+            if (
+                e.code in ("PGRST205", "PGRST204", "42703")
+                and ("server_observation_config" in err or "schema cache" in err)
+            ):
+                pass
+            else:
+                raise
 
         # Fetch from directory_view to get full DirectoryServer
         # directory_view should update immediately (it's a view, not a materialized view)
@@ -383,6 +424,22 @@ class SupabaseServersRepository(ServersRepository):
             update_data["ruleset"] = server_data.ruleset
         if server_data.effective_status is not None:
             update_data["effective_status"] = server_data.effective_status
+            # Preserve manual status separately; only set status_source='manual' when not currently agent-sourced
+            update_data["manual_status"] = server_data.manual_status or server_data.effective_status
+            update_data["manual_updated_at"] = datetime.now(timezone.utc).isoformat()
+            try:
+                if getattr(existing, "status_source", None) != "agent":
+                    update_data["status_source"] = "manual"
+            except Exception:
+                pass
+        elif server_data.manual_status is not None:
+            update_data["manual_status"] = server_data.manual_status
+            update_data["manual_updated_at"] = datetime.now(timezone.utc).isoformat()
+            try:
+                if getattr(existing, "status_source", None) != "agent":
+                    update_data["status_source"] = "manual"
+            except Exception:
+                pass
         if server_data.is_pc is not None:
             update_data["is_pc"] = server_data.is_pc
         if server_data.is_console is not None:
@@ -427,6 +484,25 @@ class SupabaseServersRepository(ServersRepository):
                     )
                     if not result.data or len(result.data) == 0:
                         raise UnauthorizedError("Server not found or you don't have permission to update it")
+            elif (e.code in ("PGRST204", "42703")) and (
+                "manual_status" in err_str or "manual_updated_at" in err_str
+            ):
+                # Pre-031: manual status columns missing; retry without them
+                update_data_retry = {
+                    k: v
+                    for k, v in update_data.items()
+                    if k not in ("manual_status", "manual_updated_at")
+                }
+                if update_data_retry:
+                    result = (
+                        self._client.table("servers")
+                        .update(update_data_retry)
+                        .eq("id", server_id)
+                        .eq("owner_user_id", user_id)
+                        .execute()
+                    )
+                    if not result.data or len(result.data) == 0:
+                        raise UnauthorizedError("Server not found or you don't have permission to update it")
             elif e.code == "PGRST204" and "rulesets" in err_str:
                 # rulesets column doesn't exist yet (migration 015 not run) - retry without it; ruleset (singular) is kept
                 update_data_retry = {k: v for k, v in update_data.items() if k != "rulesets"}
@@ -444,7 +520,39 @@ class SupabaseServersRepository(ServersRepository):
                 raise
 
         # Fetch updated server from directory_view
-        return await self.get_server(server_id, user_id)
+        updated = await self.get_server(server_id, user_id)
+
+        # Observation config update (owner-only, optional)
+        try:
+            if (
+                server_data.observation_enabled is not None
+                or server_data.observed_host is not None
+                or server_data.observed_port is not None
+            ):
+                cfg: dict = {"server_id": server_id, "observed_probe": "direct"}
+                if server_data.observation_enabled is not None:
+                    cfg["observation_enabled"] = bool(server_data.observation_enabled)
+                if server_data.observed_host is not None:
+                    cfg["observed_host"] = (
+                        server_data.observed_host.strip()
+                        if server_data.observed_host
+                        else None
+                    )
+                if server_data.observed_port is not None:
+                    cfg["observed_port"] = server_data.observed_port
+                # Upsert by primary key
+                self._client.table("server_observation_config").upsert(cfg).execute()
+        except PostgrestAPIError as e:
+            err = str(e).lower()
+            if (
+                e.code in ("PGRST205", "PGRST204", "42703")
+                and ("server_observation_config" in err or "schema cache" in err)
+            ):
+                pass
+            else:
+                raise
+
+        return updated
 
     async def delete_server(
         self, server_id: str, user_id: str

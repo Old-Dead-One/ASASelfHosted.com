@@ -11,6 +11,7 @@ from app.db.directory_repo import DirectoryRepository
 from app.db.heartbeat_jobs_repo import HeartbeatJobsRepository
 from app.db.heartbeat_repo import HeartbeatRepository
 from app.db.ingest_rejections_repo import IngestRejectionsRepository
+from app.db.observed_repo import ObservedRepository
 from app.db.maps_repo import MapsRepository
 from app.db.mock_directory_clusters_repo import MockDirectoryClustersRepository
 from app.db.mock_directory_repo import MockDirectoryRepository
@@ -26,6 +27,7 @@ from app.db.supabase_maps_repo import SupabaseMapsRepository
 from app.db.supabase_mods_catalog_repo import SupabaseModsCatalogRepository
 from app.db.supabase_servers_derived_repo import SupabaseServersDerivedRepository
 from app.db.supabase_servers_repo import SupabaseServersRepository
+from app.db.supabase_observed_repo import SupabaseObservedRepository
 
 # Reuse a single mock repo instance (stateless, so safe to share)
 _mock_repo = MockDirectoryRepository()
@@ -102,6 +104,7 @@ _heartbeat_repo: HeartbeatRepository | None = None
 _heartbeat_jobs_repo: HeartbeatJobsRepository | None = None
 _servers_derived_repo: ServersDerivedRepository | None = None
 _ingest_rejections_repo: IngestRejectionsRepository | None = None
+_observed_repo: ObservedRepository | None = None
 
 
 def get_heartbeat_repo() -> HeartbeatRepository:
@@ -150,6 +153,18 @@ def get_ingest_rejections_repo() -> IngestRejectionsRepository:
     if _ingest_rejections_repo is None:
         _ingest_rejections_repo = SupabaseIngestRejectionsRepository()
     return _ingest_rejections_repo
+
+
+def get_observed_repo() -> ObservedRepository:
+    """
+    Observed status repository provider.
+
+    Returns SupabaseObservedRepository (requires service_role key).
+    """
+    global _observed_repo
+    if _observed_repo is None:
+        _observed_repo = SupabaseObservedRepository()
+    return _observed_repo
 
 
 def get_directory_clusters_repo() -> DirectoryClustersRepository:

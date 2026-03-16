@@ -14,7 +14,7 @@
 // ============================================================================
 
 export type ServerStatus = 'online' | 'offline' | 'unknown'
-export type StatusSource = 'manual' | 'agent'
+export type StatusSource = 'manual' | 'agent' | 'observed'
 export type VerificationMode = 'manual' | 'verified'
 export type GameMode = 'pvp' | 'pve' | 'pvpve'
 export type Ruleset = 'vanilla' | 'vanilla_qol' | 'boosted' | 'modded'

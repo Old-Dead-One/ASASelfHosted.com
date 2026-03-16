@@ -20,6 +20,7 @@ from app.api.v1 import (
     maps,
     me,
     mods,
+    observed,
     servers,
     subscriptions,
     verification,
@@ -44,6 +45,7 @@ router.include_router(admin.router)
 router.include_router(heartbeat.router)
 router.include_router(consent.router)
 router.include_router(mods.router)
+router.include_router(observed.router)
 router.include_router(subscriptions.router)
 router.include_router(webhooks.router)
 

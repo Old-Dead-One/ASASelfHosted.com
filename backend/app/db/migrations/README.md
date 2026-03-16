@@ -74,6 +74,28 @@ Extends Sprint 0 schema with:
    - `directory_view` has been updated
    - Indexes have been created
 
+### `031_observed_status.sql`
+**Observed Status - Schema Foundations**
+
+- Extends `status_source` enum with `observed`
+- Adds observed result fields on `servers` (`observed_status`, `observed_checked_at`, etc.)
+- Adds `manual_status` and `manual_updated_at` to preserve owner-managed status across monitoring modes
+- Creates `server_observation_config` (owner-only) for opt-in observation settings (host/port/probe)
+
+**To Run:**
+1. Run after the base schema (and any existing migrations)
+2. Execute `031_observed_status.sql` in Supabase SQL Editor
+
+### `032_observed_refresh_queue.sql`
+**Observed Status - On-Demand Refresh Queue**
+
+- Creates `observed_refresh_queue` table used by FastAPI + worker to run on-demand observed checks
+- Adds dedupe constraint (one queued row per server) and basic indexes
+
+**To Run:**
+1. Run after `031_observed_status.sql`
+2. Execute `032_observed_refresh_queue.sql` in Supabase SQL Editor
+
 ## Schema Decisions
 
 ### Status Model

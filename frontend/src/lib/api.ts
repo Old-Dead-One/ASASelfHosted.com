@@ -624,6 +624,51 @@ export async function generateServerKeys(serverId: string): Promise<ServerKeyPai
 }
 
 // =============================================================================
+// Observed Status (owner opt-in)
+// =============================================================================
+
+export type ObservedRefreshReason =
+    | 'filter'
+    | 'search'
+    | 'server_detail'
+    | 'cluster_view'
+    | 'owner_login'
+    | 'test_button'
+
+export interface ObservedRefreshResponse {
+    queued: number
+    skipped_fresh: number
+    skipped_dupe: number
+}
+
+export interface ServerObservationConfig {
+    observation_enabled: boolean
+    observed_host: string | null
+    observed_port: number | null
+    observed_probe: string
+}
+
+export interface ServerObservedLatestResponse {
+    server_id: string
+    config: ServerObservationConfig
+    observed_status: 'online' | 'offline' | 'unknown' | null
+    observed_checked_at: string | null
+    observed_latency_ms: number | null
+    observed_error: string | null
+}
+
+export async function refreshObserved(serverIds: string[], reason: ObservedRefreshReason): Promise<ObservedRefreshResponse> {
+    return apiRequest<ObservedRefreshResponse>('/api/v1/observed/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ server_ids: serverIds, reason }),
+    })
+}
+
+export async function getObservedLatest(serverId: string): Promise<ServerObservedLatestResponse> {
+    return apiRequest<ServerObservedLatestResponse>(`/api/v1/observed/latest/${serverId}`)
+}
+
+// =============================================================================
 // Mods Resolution
 // =============================================================================
 

@@ -31,6 +31,8 @@ Single entry point for ASA Self-Hosted documentation.
 | **docs/REMAINING_VS_DESIGN.md** | What’s left vs original design docs; complete vs not done; priority summary. |
 | **docs/SPRINT_8.md** | Sprint 8 playbook + completion status (hardening, trust, ops). |
 | **docs/SPRINT_9.md** | Sprint 9 playbook + status (launch readiness, contact, limits, key UI). |
+| **docs/SPRINT_10.md** | Sprint 10 playbook (agent bootstrap handshake, opt-in keys, protocol doc, stub quarantine). |
+| **docs/SPRINT_11.md** | Sprint 11 playbook (Local Agent v0.1 Windows-first: handshake, opt-in transmit, heartbeats). |
 
 ---
 
@@ -41,6 +43,7 @@ Single entry point for ASA Self-Hosted documentation.
 | **docs/RANKING.md** | Ranking/sort contract: rank_by, quality_score, backend/frontend behavior. |
 | **docs/TRUST_PAGES.md** | Trust pages (/verification, /consent) content and acceptance criteria. |
 | **docs/OPERATIONS.md** | Ingest contract, drop-on-violation, responsibility map, background jobs, failure modes, alerting. |
+| **docs/STATUS_MODEL.md** | Status truth model: manual vs observed vs agent; precedence, freshness, and guardrails. |
 | **docs/SERVER_IMAGES.md** | Server images feature spec (banner upload, moderation). |
 | **docs/OPERATIONS.md** | Contact handling, data lifecycle, ingest, jobs, failure modes (see §7–§8). |
 | **docs/REFERENCE_SCHEMA_SPRINT0_TO_5.md** | Historical schema reference (Sprint 0–5); current schema in migrations/README. |

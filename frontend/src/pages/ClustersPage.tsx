@@ -86,7 +86,7 @@ export function ClustersPage() {
                             {clusters.map((cluster) => (
                                 <li key={cluster.id}>
                                     <Link
-                                        to={`/clusters/${encodeURIComponent(cluster.slug)}`}
+                                        to={`/clusters/${encodeURIComponent(cluster.slug)}?id=${encodeURIComponent(cluster.id)}`}
                                         className="block rounded-xl border border-input bg-background-elevated p-4 shadow-lg shadow-black/40 hover:border-primary/40 hover:bg-muted/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                         <h2 className="text-lg font-semibold text-foreground mb-1">

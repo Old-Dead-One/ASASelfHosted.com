@@ -34,6 +34,8 @@ function buildParams(filters?: ServerFilters, cursor?: string | null): URLSearch
     if (filters?.ruleset) params.set('ruleset', filters.ruleset)
     if (filters?.is_cluster) params.set('is_cluster', filters.is_cluster)
     if (filters?.cluster?.trim()) params.set('cluster', filters.cluster.trim())
+    // Filter by specific cluster ID (used by cluster detail page for uniqueness)
+    if ((filters as any)?.cluster_id?.trim()) params.set('cluster_id', (filters as any).cluster_id.trim())
     if (filters?.platform) {
         if (filters.platform === 'pc') {
             params.set('pc', 'true')

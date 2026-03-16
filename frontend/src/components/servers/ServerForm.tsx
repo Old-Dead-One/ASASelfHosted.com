@@ -7,7 +7,7 @@
 import { useState, FormEvent, useEffect, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ServerStatus, GameMode, Ruleset } from '@/types'
-import { listMyClusters, type Cluster, resolveMods, type ResolvedMod, apiRequest, getServerAgentKeyStatus, generateServerKeys, type ServerKeyPairResponse } from '@/lib/api'
+import { listMyClusters, type Cluster, resolveMods, type ResolvedMod, apiRequest, getServerAgentKeyStatus, generateServerKeys, type ServerKeyPairResponse, getObservedLatest, refreshObserved, type ServerObservedLatestResponse } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 
 const OTHER_MAP_VALUE = '__other__'
@@ -44,6 +44,9 @@ export interface ServerFormData {
     effective_status: ServerStatus | ''
     cluster_id: string | ''
     platform: PlatformChoice | ''
+    observation_enabled: boolean
+    observed_host: string
+    observed_port: string
 }
 
 interface ServerFormProps {
@@ -83,6 +86,9 @@ export function ServerForm({
         effective_status: initialData?.effective_status || '',
         cluster_id: initialData?.cluster_id || '',
         platform: initialData?.platform || '',
+        observation_enabled: (initialData as any)?.observation_enabled ?? false,
+        observed_host: (initialData as any)?.observed_host ?? '',
+        observed_port: (initialData as any)?.observed_port ?? '',
     })
     const [clusters, setClusters] = useState<Cluster[]>([])
     const [loadingClusters, setLoadingClusters] = useState(false)
@@ -94,12 +100,66 @@ export function ServerForm({
     const [serverKeyGenerating, setServerKeyGenerating] = useState(false)
     const [serverKeyResult, setServerKeyResult] = useState<ServerKeyPairResponse | null>(null)
     const [serverKeyCopied, setServerKeyCopied] = useState(false)
+    const [observedTesting, setObservedTesting] = useState(false)
+    const [observedTestError, setObservedTestError] = useState<string | null>(null)
+    const [observedLatestOverride, setObservedLatestOverride] = useState<ServerObservedLatestResponse | null>(null)
+    const [observedTestStatus, setObservedTestStatus] = useState<'idle' | 'queued' | 'polling' | 'updated' | 'timeout'>('idle')
+    const [observedConfigDirty, setObservedConfigDirty] = useState(false)
+
+    const parseHostFromJoinAddress = useCallback((join: string): string => {
+        let v = (join || '').trim()
+        if (!v) return ''
+        // strip scheme if user pasted one
+        if (v.includes('://')) v = v.split('://', 2)[1] ?? v
+        // IPv6 [addr]:port
+        if (v.startsWith('[')) {
+            const end = v.indexOf(']')
+            if (end > 1) return v.slice(1, end)
+        }
+        // host:port (take first segment)
+        const parts = v.split(':')
+        return parts.length > 1 ? parts[0] : v
+    }, [])
 
     const { data: agentKeyStatus, refetch: refetchAgentKeyStatus } = useQuery({
         queryKey: ['server-agent-key-status', serverId],
         queryFn: () => getServerAgentKeyStatus(serverId!),
         enabled: !!serverId,
     })
+
+    const { data: observedLatest, refetch: refetchObservedLatest } = useQuery({
+        queryKey: ['observed-latest', serverId],
+        queryFn: () => getObservedLatest(serverId!),
+        enabled: !!serverId,
+        // Observation config can change during save; always refetch on mount.
+        staleTime: 0,
+        refetchOnMount: 'always',
+    })
+
+    // Reset per-server observation UI state when switching servers / reopening the form
+    useEffect(() => {
+        setObservedLatestOverride(null)
+        setObservedTestError(null)
+        setObservedTestStatus('idle')
+        setObservedConfigDirty(false)
+    }, [serverId])
+
+    // Hydrate observation config from backend when editing.
+    // If the user hasn't edited the observation config in this session, keep it in sync with DB.
+    useEffect(() => {
+        const latest = observedLatestOverride ?? observedLatest
+        if (!latest) return
+        if (observedConfigDirty) return
+
+        setFormData((prev) => {
+            const next = { ...prev }
+            next.observation_enabled = latest.config.observation_enabled
+            next.observed_host = latest.config.observed_host ?? ''
+            next.observed_port =
+                latest.config.observed_port != null ? String(latest.config.observed_port) : ''
+            return next
+        })
+    }, [observedLatest, observedLatestOverride, observedConfigDirty])
 
     const { data: mapsData } = useQuery({
         queryKey: ['maps'],
@@ -190,7 +250,13 @@ export function ServerForm({
         formData.map_name.trim() !== '' &&
         formData.game_mode !== '' &&
         formData.platform !== '' &&
-        hasRuleset
+        hasRuleset &&
+        (!formData.observation_enabled ||
+            (formData.observed_host.trim() !== '' &&
+                (() => {
+                    const p = parseInt(formData.observed_port, 10)
+                    return Number.isFinite(p) && p >= 1 && p <= 65535
+                })()))
 
     return (
         <form onSubmit={handleSubmit} className={FORM_SPACE}>
@@ -448,6 +514,174 @@ export function ServerForm({
                                 maxLength={256}
                                 className="input-tek"
                             />
+                            <div className="mt-2 rounded-md border border-input/70 bg-muted/25 p-2.5">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.observation_enabled}
+                                        onChange={(e) => {
+                                            const enabled = e.target.checked
+                                            setObservedConfigDirty(true)
+                                            setFormData((prev) => {
+                                                const hostDefault = prev.observed_host || parseHostFromJoinAddress(prev.join_address)
+                                                return {
+                                                    ...prev,
+                                                    observation_enabled: enabled,
+                                                    observed_host: enabled ? hostDefault : prev.observed_host,
+                                                }
+                                            })
+                                        }}
+                                        className="h-4 w-4 rounded border-input bg-background shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                                        aria-label="Enable Observation"
+                                    />
+                                    <span className="text-sm text-foreground">Enable Observation (best-effort)</span>
+                                </label>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Optional. Observation is not verified; it’s a fast best-effort status check. Use the Test button to find which port works best.
+                                </p>
+
+                                <div className={`mt-2 grid grid-cols-1 md:grid-cols-2 ${FORM_GAP} md:items-start`}>
+                                    <div>
+                                        <label htmlFor="observed_host" className="label-tek">Observed Host</label>
+                                        <input
+                                            id="observed_host"
+                                            type="text"
+                                            value={formData.observed_host}
+                                            onChange={(e) => {
+                                                setObservedConfigDirty(true)
+                                                setFormData({ ...formData, observed_host: e.target.value })
+                                            }}
+                                            disabled={!formData.observation_enabled}
+                                            maxLength={256}
+                                            className="input-tek disabled:opacity-50"
+                                            placeholder="Defaults from Join Address"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="observed_port" className="label-tek">Observed Port</label>
+                                        <input
+                                            id="observed_port"
+                                            type="number"
+                                            value={formData.observed_port}
+                                            onChange={(e) => {
+                                                setObservedConfigDirty(true)
+                                                setFormData({ ...formData, observed_port: e.target.value })
+                                            }}
+                                            disabled={!formData.observation_enabled}
+                                            min={1}
+                                            max={65535}
+                                            className="input-tek disabled:opacity-50"
+                                            placeholder="e.g. 7777"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={!serverId || observedTesting || !formData.observation_enabled}
+                                        onClick={async () => {
+                                            if (!serverId) return
+                                            setObservedTestError(null)
+                                            setObservedTesting(true)
+                                            setObservedTestStatus('queued')
+                                            try {
+                                                const beforeLatest = (observedLatestOverride ?? observedLatest)
+                                                const beforeKey = JSON.stringify({
+                                                    checked_at: beforeLatest?.observed_checked_at ?? null,
+                                                    status: beforeLatest?.observed_status ?? null,
+                                                    error: beforeLatest?.observed_error ?? null,
+                                                    latency_ms: beforeLatest?.observed_latency_ms ?? null,
+                                                })
+                                                await refreshObserved([serverId], 'test_button')
+                                                setObservedTestStatus('polling')
+                                                // Poll up to ~30s for a new observed result.
+                                                // Supabase reads can lag briefly behind writes (replica), so 10s is sometimes too short.
+                                                const start = Date.now()
+                                                let updated = false
+                                                while (Date.now() - start < 30_000) {
+                                                    const res = await refetchObservedLatest()
+                                                    const latest = res.data
+                                                    if (latest) setObservedLatestOverride(latest)
+                                                    const latestKey = JSON.stringify({
+                                                        checked_at: latest?.observed_checked_at ?? null,
+                                                        status: latest?.observed_status ?? null,
+                                                        error: latest?.observed_error ?? null,
+                                                        latency_ms: latest?.observed_latency_ms ?? null,
+                                                    })
+                                                    if (latest && latestKey !== beforeKey) {
+                                                        updated = true
+                                                        break
+                                                    }
+                                                    await new Promise((r) => setTimeout(r, 1200))
+                                                }
+                                                setObservedTestStatus(updated ? 'updated' : 'timeout')
+                                            } catch (err) {
+                                                setObservedTestStatus('timeout')
+                                                setObservedTestError(err instanceof Error ? err.message : 'Failed to test observation')
+                                            } finally {
+                                                setObservedTesting(false)
+                                            }
+                                        }}
+                                    >
+                                        {observedTesting ? 'Testing…' : 'Test Observation'}
+                                    </Button>
+                                    {!serverId && (
+                                        <span className="text-xs text-muted-foreground">
+                                            Save this server first to test observation.
+                                        </span>
+                                    )}
+                                    {serverId && (
+                                        <span className="text-xs text-muted-foreground">
+                                            Test uses saved values. If you changed host/port, click Save first.
+                                        </span>
+                                    )}
+                                </div>
+
+                                {observedTestError && (
+                                    <p className="text-xs text-destructive mt-1">{observedTestError}</p>
+                                )}
+                                {observedTestStatus === 'timeout' && !observedTestError && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Observation was queued, but no update arrived yet. This usually means the observed worker isn’t running, the probe timed out, or the DB hasn’t applied the observation migrations.
+                                        You can leave this open and click “Test Observation” again after a moment.
+                                    </p>
+                                )}
+
+                                {(observedLatestOverride ?? observedLatest) && (
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            <span>
+                                                Last observed:{' '}
+                                                {(observedLatestOverride ?? observedLatest)!.observed_checked_at
+                                                    ? new Date((observedLatestOverride ?? observedLatest)!.observed_checked_at as string).toLocaleString()
+                                                    : 'Never'}
+                                            </span>
+                                            <span>
+                                                Result:{' '}
+                                                {(observedLatestOverride ?? observedLatest)!.observed_status ?? '—'}
+                                            </span>
+                                            {(observedLatestOverride ?? observedLatest)!.observed_latency_ms != null && (
+                                                <span>Latency: {(observedLatestOverride ?? observedLatest)!.observed_latency_ms}ms</span>
+                                            )}
+                                            {(observedLatestOverride ?? observedLatest)!.observed_error && (
+                                                <span>Error: {(observedLatestOverride ?? observedLatest)!.observed_error}</span>
+                                            )}
+                                            {observedTestStatus === 'queued' && (
+                                                <span className="text-muted-foreground italic">Queued…</span>
+                                            )}
+                                            {observedTestStatus === 'polling' && (
+                                                <span className="text-muted-foreground italic">Waiting…</span>
+                                            )}
+                                            {observedTestStatus === 'updated' && (
+                                                <span className="text-foreground">Updated</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 

@@ -45,10 +45,17 @@ class ServerCreateRequest(BaseSchema):
     ruleset: Ruleset | None = None
     rulesets: list[str] | None = None  # Vanilla can be +Modded, not +Boosted. Vanilla QoL can be +Boosted, not +Modded. Vanilla and Vanilla QoL are mutually exclusive.
     effective_status: ServerStatus | None = None  # Defaults to 'unknown' in repo
+    # Manual status (owner-managed). If omitted, manual_status defaults to effective_status in repo.
+    manual_status: ServerStatus | None = None
     # Platform (owner choice: pc only, console only, or crossplay)
     is_pc: bool | None = None
     is_console: bool | None = None
     is_crossplay: bool | None = None
+
+    # Observation (opt-in, owner-only config stored in server_observation_config)
+    observation_enabled: bool | None = None
+    observed_host: str | None = None
+    observed_port: int | None = None
 
     @model_validator(mode="after")
     def validate_rulesets(self) -> "ServerCreateRequest":
@@ -74,6 +81,22 @@ class ServerCreateRequest(BaseSchema):
                 f"ASASelfHosted lists self-hosted servers only. "
                 f"hosting_provider must be 'self_hosted', got '{self.hosting_provider}'"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> "ServerCreateRequest":
+        """If observation is enabled, require observed_host and observed_port."""
+        from app.core.errors import DomainValidationError
+
+        if self.observation_enabled:
+            if not (self.observed_host or "").strip():
+                raise DomainValidationError(
+                    "observed_host is required when observation_enabled is true"
+                )
+            if self.observed_port is None:
+                raise DomainValidationError(
+                    "observed_port is required when observation_enabled is true"
+                )
         return self
 
 
@@ -104,9 +127,15 @@ class ServerUpdateRequest(BaseSchema):
     ruleset: Ruleset | None = None
     rulesets: list[str] | None = None  # Same rules as create: Vanilla not +Boosted; Vanilla QoL not +Modded; Vanilla vs Vanilla QoL exclusive
     effective_status: ServerStatus | None = None
+    manual_status: ServerStatus | None = None
     is_pc: bool | None = None
     is_console: bool | None = None
     is_crossplay: bool | None = None
+
+    # Observation (opt-in, owner-only config stored in server_observation_config)
+    observation_enabled: bool | None = None
+    observed_host: str | None = None
+    observed_port: int | None = None
 
     @model_validator(mode="after")
     def validate_rulesets(self) -> "ServerUpdateRequest":
@@ -135,6 +164,22 @@ class ServerUpdateRequest(BaseSchema):
                 f"Cannot change hosting_provider to '{self.hosting_provider}'. "
                 f"Must be 'self_hosted'."
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> "ServerUpdateRequest":
+        """If observation is enabled (or explicitly set), require host/port."""
+        from app.core.errors import DomainValidationError
+
+        if self.observation_enabled is True:
+            if not (self.observed_host or "").strip():
+                raise DomainValidationError(
+                    "observed_host is required when observation_enabled is true"
+                )
+            if self.observed_port is None:
+                raise DomainValidationError(
+                    "observed_port is required when observation_enabled is true"
+                )
         return self
 
 
