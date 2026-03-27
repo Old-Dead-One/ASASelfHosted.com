@@ -109,6 +109,15 @@ export function FaqPage() {
 
             <section className="space-y-4 mb-8">
                 <h2 className="text-xl font-semibold text-foreground">
+                    Do server limits reset monthly?
+                </h2>
+                <p className="text-muted-foreground">
+                    No. Server and cluster limits are per account and do not reset monthly. Deleting a server or cluster frees a slot. If you need more, contact us.
+                </p>
+            </section>
+
+            <section className="space-y-4 mb-8">
+                <h2 className="text-xl font-semibold text-foreground">
                     Can you remove a server listing?
                 </h2>
                 <p className="text-muted-foreground">

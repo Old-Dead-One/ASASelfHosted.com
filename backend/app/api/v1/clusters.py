@@ -61,7 +61,11 @@ async def create_cluster(
             pass
     if clusters_used >= clusters_limit:
         raise APIError(
-            message=f"You have reached the maximum number of clusters ({clusters_limit}). Delete a cluster to add another, or contact us to request a higher limit.",
+            message=(
+                f"You have reached the maximum number of clusters ({clusters_limit}). "
+                "Limits are per account and do not reset monthly. Delete a cluster to add another, "
+                "or contact us to request a higher limit."
+            ),
             status_code=403,
             error_code="cluster_limit_reached",
         )
